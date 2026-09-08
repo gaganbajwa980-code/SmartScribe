@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "SmartScribe Browser Bridge",
+  "version": "1.0.0",
+  "description": "Read-only webpage article bridge for SmartScribe Desktop AI Assistant.",
+  "permissions": [
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "http://127.0.0.1:5000/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Send Page to SmartScribe (Alt+S)"
+  },
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Alt+S",
+        "windows": "Alt+S",
+        "mac": "Alt+S"
+      },
+      "description": "Send active webpage to SmartScribe"
+    }
+  }
+}

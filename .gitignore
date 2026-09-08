@@ -1,0 +1,67 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Local AI models
+models/*.gguf
+models/*.bin
+models/*.safetensors
+models/*.pt
+models/*.pth
+
+# User-generated SmartScribe data
+recordings/*
+notes/*
+data/*
+workspaces/*
+
+# Keep directory structure in Git
+!recordings/.gitkeep
+!notes/.gitkeep
+!data/.gitkeep
+!workspaces/.gitkeep
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs / temporary files
+*.log
+*.tmp
+*.temp
+tmp/
+temp/
+
+# OS / editor files
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# Build / generated files
+dist/
+build/
+*.egg-info/
+
+# Local test artifacts
+scratch/
+
+# All local AI model files
+models/*
+!models/.gitkeep

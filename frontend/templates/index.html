@@ -1,0 +1,1376 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SmartScribe — Modern AI Workspace</title>
+  <link rel="stylesheet" href="/static/css/design_system.css">
+</head>
+<body>
+
+<div class="app-container">
+  <!-- ======================================================= -->
+  <!-- SIDEBAR                                                 -->
+  <!-- ======================================================= -->
+  <aside class="sidebar" id="app-sidebar">
+    <div class="sidebar-header">
+      <a href="#" class="brand" onclick="navigateTo('dashboard'); return false;">
+        <div class="brand-icon">
+          <svg class="svg-icon svg-md" viewBox="0 0 24 24" style="color: #fff;"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3z"/></svg>
+        </div>
+        <span>SmartScribe</span>
+      </a>
+      <button class="collapse-btn" id="sidebar-toggle" title="Toggle Sidebar (Ctrl + \)">
+        <svg class="svg-icon svg-xs" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+    </div>
+
+    <nav class="sidebar-nav">
+      <!-- Primary Navigation -->
+      <div class="nav-group">
+        <div class="nav-group-title">Primary</div>
+        <div class="nav-item active" data-view="dashboard" onclick="navigateTo('dashboard')">
+          <span class="icon"><svg class="svg-icon" viewBox="0 0 24 24"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3z"/></svg></span>
+          <span>Home</span>
+        </div>
+        <div class="nav-item" data-view="library" onclick="navigateTo('library')">
+          <span class="icon"><svg class="svg-icon" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></span>
+          <span>Media</span>
+        </div>
+        <div class="nav-item" data-view="notes" onclick="navigateTo('notes')">
+          <span class="icon"><svg class="svg-icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>
+          <span>Notes</span>
+        </div>
+        <div class="nav-item" data-view="workspaces" onclick="navigateTo('workspaces')">
+          <span class="icon"><svg class="svg-icon" viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg></span>
+          <span>Workspaces</span>
+        </div>
+      </div>
+
+      <!-- Collapsible Secondary Group ("More Tools") -->
+      <div class="nav-group-collapsible">
+        <div class="more-tools-toggle" id="more-tools-btn" onclick="toggleMoreTools()">
+          <span style="display: flex; align-items: center; gap: 8px;">
+            <svg class="svg-icon svg-xs" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+            <span>More Tools</span>
+          </span>
+          <svg class="svg-icon svg-xs" id="more-tools-arrow" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+
+        <div class="more-tools-drawer collapsed" id="more-tools-drawer">
+          <div class="nav-item" data-view="recorder" onclick="navigateTo('recorder')">
+            <span class="icon"><svg class="svg-icon" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg></span>
+            <span>Live Studio</span>
+          </div>
+          <div class="nav-item" data-view="import" onclick="navigateTo('import')">
+            <span class="icon"><svg class="svg-icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></span>
+            <span>Import Media</span>
+          </div>
+          <div class="nav-item" data-view="video" onclick="navigateTo('video')">
+            <span class="icon"><svg class="svg-icon" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><polygon points="10 8 16 11.5 10 15 10 8"/><line x1="2" y1="21" x2="22" y2="21"/></svg></span>
+            <span>Media Workspace</span>
+          </div>
+          <div class="nav-item" data-view="transform" onclick="navigateTo('transform')">
+            <span class="icon"><svg class="svg-icon" viewBox="0 0 24 24"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3z"/></svg></span>
+            <span>Magic Transform</span>
+          </div>
+          <div class="nav-item" data-view="chat" onclick="navigateTo('chat')">
+            <span class="icon"><svg class="svg-icon" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+            <span>Ask SmartScribe</span>
+          </div>
+          <div class="nav-item" data-view="search" onclick="navigateTo('search')">
+            <span class="icon"><svg class="svg-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
+            <span>"Find It" Search</span>
+          </div>
+          <div class="nav-item" data-view="study" onclick="navigateTo('study')">
+            <span class="icon"><svg class="svg-icon" viewBox="0 0 24 24"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg></span>
+            <span>Study Mode</span>
+          </div>
+          <div class="nav-item" data-view="teach" onclick="navigateTo('teach')">
+            <span class="icon"><svg class="svg-icon" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></span>
+            <span>"Teach Me" Tutor</span>
+          </div>
+          <div class="nav-item" data-view="coach" onclick="navigateTo('coach')">
+            <span class="icon"><svg class="svg-icon" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></span>
+            <span>Speaking Coach</span>
+          </div>
+          <div class="nav-item" data-view="jobs" onclick="navigateTo('jobs')">
+            <span class="icon"><svg class="svg-icon" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg></span>
+            <span>Processing Queue</span>
+          </div>
+          <div class="nav-item" data-view="settings" onclick="navigateTo('settings')">
+            <span class="icon"><svg class="svg-icon" viewBox="0 0 24 24"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg></span>
+            <span>Settings</span>
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="model-badge">
+        <span class="status-dot"></span>
+        <span class="user-info">Local AI Active</span>
+      </div>
+      <button class="collapse-btn" id="theme-toggle" title="Switch Dark/Light Theme">
+        <svg class="svg-icon svg-sm" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
+    </div>
+  </aside>
+
+  <!-- ======================================================= -->
+  <!-- MAIN APPLICATION WRAPPER                               -->
+  <!-- ======================================================= -->
+  <main class="main-wrapper">
+    <!-- Top Header -->
+    <header class="top-header">
+      <div class="header-left">
+        <h1 class="page-title" id="page-title">Dashboard</h1>
+      </div>
+      <div class="header-right">
+        <!-- Quick Search / Command Palette Trigger -->
+        <div class="search-trigger" onclick="openCommandPalette()">
+          <svg class="svg-icon svg-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <span>Search or command...</span>
+          <span class="kbd-shortcut">Ctrl K</span>
+        </div>
+        <!-- Active Processing Queue Pill -->
+        <div id="header-job-pill" style="display: none; cursor: pointer;" onclick="navigateTo('jobs')">
+          <span class="type-badge type-video" style="display: flex; align-items: center; gap: 6px;">
+            <span class="status-dot" style="background: var(--accent-primary);"></span>
+            <span id="header-job-text">Processing 1 item...</span>
+          </span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Viewport Container -->
+    <div class="view-container">
+
+      <!-- ===================================================== -->
+      <!-- VIEW: DASHBOARD                                       -->
+      <!-- ===================================================== -->
+      <section class="view-section active" id="view-dashboard">
+        <div class="assistant-home-view">
+
+          <!-- Assistant Header & Status Bar -->
+          <div class="assistant-header-bar">
+            <div class="assistant-brand-tag">
+              <svg class="svg-icon svg-sm" viewBox="0 0 24 24" style="color: var(--accent-primary);"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3z"/></svg>
+              <span>SmartScribe Personal Assistant</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <div class="assistant-speech-pill" id="assistant-speech-indicator" style="display: none; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.3); font-size: 0.76rem; color: #38bdf8;">
+                <span class="pulse-dot" style="width: 6px; height: 6px; border-radius: 50%; background: #38bdf8; display: inline-block;"></span>
+                <span>Speaking</span>
+              </div>
+              <button class="assistant-speech-stop-btn" id="assistant-speech-stop-btn" style="display: none; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 999px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); font-size: 0.76rem; color: #ef4444; cursor: pointer;" onclick="stopAssistantSpeech()" title="Stop Voice Response (Escape)">
+                <span>⏹ Stop</span>
+              </button>
+              <div class="assistant-status-pill" id="assistant-system-pill">
+                <span class="assistant-status-dot"></span>
+                <span id="assistant-system-status-text">Ready</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Greeting -->
+          <div class="assistant-greeting-block">
+            <h2 class="assistant-greeting-title" id="assistant-greeting-heading">Good evening.</h2>
+            <p class="assistant-greeting-sub">How can I assist your meetings, lectures, or system tasks today?</p>
+          </div>
+
+          <!-- Central Hero Command Input -->
+          <div class="command-input-hero-card">
+            <svg class="svg-icon svg-md" viewBox="0 0 24 24" style="color: var(--accent-primary); flex-shrink: 0;"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3z"/></svg>
+            <input type="text" id="assistant-command-input" class="command-input-hero-field" placeholder="Ask SmartScribe anything... (e.g. 'Open Chrome', 'How is my laptop?')" onkeydown="if(event.key==='Enter') submitAssistantCommand()">
+            <div class="command-input-hero-actions">
+              <button class="command-mic-btn" id="assistant-mic-btn" title="Push-to-talk (Alt+V or Click to toggle)" onclick="handleAssistantMicClick()">
+                <svg class="svg-icon svg-sm" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
+              </button>
+              <button class="command-submit-btn" id="assistant-submit-btn" onclick="submitAssistantCommand()">
+                <span>Ask</span>
+                <svg class="svg-icon svg-xs" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Command Examples -->
+          <div class="command-examples-row">
+            <span class="command-examples-label">Try:</span>
+            <span class="command-example-chip" onclick="setAndRunCommand('Open Chrome')">"Open Chrome"</span>
+            <span class="command-example-chip" onclick="setAndRunCommand('How is my laptop?')">"How is my laptop?"</span>
+            <span class="command-example-chip" onclick="setAndRunCommand('Summarize this page')">"Summarize this page"</span>
+            <span class="command-example-chip" onclick="setAndRunCommand('Read this article')">"Read this article"</span>
+            <span class="command-example-chip" onclick="setAndRunCommand('What time is it?')">"What time is it?"</span>
+            <span class="command-example-chip" onclick="setAndRunCommand('Summarize today\'s lecture')">"Summarize today's lecture"</span>
+          </div>
+
+          <!-- Assistant Conversation & Live Tool Stream -->
+          <div class="assistant-dialogue-surface" id="assistant-dialogue-box" style="display: none;">
+            <!-- Rendered dynamically by app.js -->
+          </div>
+
+          <!-- Active Task / Background Progress Indicator -->
+          <div class="active-task-card" id="assistant-active-task-card">
+            <div class="active-task-info">
+              <div class="brand-icon" style="width: 32px; height: 32px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; background: var(--bg-app); color: var(--accent-primary);">
+                <svg class="svg-icon svg-sm" viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+              </div>
+              <div>
+                <div class="active-task-title" id="active-task-heading">SmartScribe Assistant</div>
+                <div class="active-task-sub" id="active-task-desc">Idle • Local Qwen2.5-3B and Faster-Whisper ready</div>
+              </div>
+            </div>
+            <span class="type-badge type-meeting" id="active-task-badge" style="font-size: 0.76rem;">● Standby</span>
+          </div>
+
+          <!-- Quick Actions Strip -->
+          <div class="quick-actions-strip">
+            <div class="quick-actions-title">Quick Actions</div>
+            <div class="quick-actions-buttons">
+              <div class="quick-action-button" onclick="navigateTo('recorder')">
+                <div class="quick-action-icon">
+                  <svg class="svg-icon svg-md" viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+                </div>
+                <div>
+                  <div class="quick-action-label">Start Meeting</div>
+                  <div class="quick-action-sub">Live transcription studio</div>
+                </div>
+              </div>
+
+              <div class="quick-action-button" onclick="toggleQuickRecord()">
+                <div class="quick-action-icon" style="color: var(--status-error);">
+                  <svg class="svg-icon svg-md" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
+                </div>
+                <div>
+                  <div class="quick-action-label" id="quick-record-btn-text">Record Audio</div>
+                  <div class="quick-action-sub" id="quick-record-btn-sub">Instant microphone capture</div>
+                </div>
+              </div>
+
+              <div class="quick-action-button" onclick="navigateTo('search')">
+                <div class="quick-action-icon" style="color: var(--accent-secondary);">
+                  <svg class="svg-icon svg-md" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                </div>
+                <div>
+                  <div class="quick-action-label">Search</div>
+                  <div class="quick-action-sub">Global BM25 intelligence</div>
+                </div>
+              </div>
+
+              <div class="quick-action-button" onclick="navigateTo('notes')">
+                <div class="quick-action-icon" style="color: var(--accent-amber);">
+                  <svg class="svg-icon svg-md" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                </div>
+                <div>
+                  <div class="quick-action-label">Smart Notes</div>
+                  <div class="quick-action-sub">Markdown &amp; action items</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bottom Grid: Recent Intelligence + System Snapshot -->
+          <div class="home-bottom-grid">
+            <!-- Recent Intelligence -->
+            <div class="recent-intel-container">
+              <div style="display: flex; align-items: center; justify-content: space-between;">
+                <span class="quick-actions-title">Recent Intelligence</span>
+                <span class="view-all-link" style="font-size: 0.8rem; cursor: pointer;" onclick="navigateTo('library')">View Library →</span>
+              </div>
+              <div id="home-recent-intel-items" style="display: flex; flex-direction: column; gap: 8px;">
+                <p style="color: var(--text-muted); font-size: 0.88rem;">Loading recent sessions...</p>
+              </div>
+            </div>
+
+            <!-- System Snapshot -->
+            <div class="system-snapshot-card">
+              <div class="system-snapshot-header">
+                <span>System Snapshot</span>
+                <span style="font-size: 0.72rem; color: var(--accent-primary); cursor: pointer;" onclick="refreshSystemSnapshot()">↻ Refresh</span>
+              </div>
+              <div class="system-snapshot-grid">
+                <div class="snapshot-tile">
+                  <span class="snapshot-tile-label">RAM Usage</span>
+                  <span class="snapshot-tile-val" id="snap-ram-pct">--%</span>
+                  <span class="snapshot-tile-status" id="snap-ram-state">Normal</span>
+                </div>
+                <div class="snapshot-tile">
+                  <span class="snapshot-tile-label">CPU Load</span>
+                  <span class="snapshot-tile-val" id="snap-cpu-pct">--%</span>
+                  <span class="snapshot-tile-status" id="snap-cpu-state">Active</span>
+                </div>
+                <div class="snapshot-tile">
+                  <span class="snapshot-tile-label">GPU</span>
+                  <span class="snapshot-tile-val" id="snap-gpu-val" style="font-size: 0.95rem;">RTX 3050</span>
+                  <span class="snapshot-tile-status" id="snap-gpu-state">CUDA Ready</span>
+                </div>
+                <div class="snapshot-tile">
+                  <span class="snapshot-tile-label">Storage</span>
+                  <span class="snapshot-tile-val" id="snap-storage-val" style="font-size: 0.95rem;">-- GB</span>
+                  <span class="snapshot-tile-status" id="snap-storage-state">Available</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ===================================================== -->
+      <!-- VIEW: LIVE STUDIO (RECORDER)
+
+      <!-- ===================================================== -->
+      <!-- VIEW: LIVE STUDIO (RECORDER)                          -->
+      <!-- ===================================================== -->
+      <section class="view-section" id="view-recorder">
+        <div class="studio-container">
+          <div class="studio-main-card">
+            <div>
+              <div style="display: flex; align-items: center; justify-content: space-between;">
+                <h3>Live Audio Studio</h3>
+                <span id="studio-status-badge" class="type-badge type-meeting">Microphone Ready</span>
+              </div>
+              <div class="recording-timer-large" id="studio-timer">00:00</div>
+              
+              <!-- Waveform Visualizer -->
+              <div class="waveform-box">
+                <canvas id="waveform-canvas"></canvas>
+              </div>
+            </div>
+
+            <!-- Controls -->
+            <div>
+              <div class="recording-controls">
+                <button class="btn-record-main" id="btn-toggle-record" onclick="toggleRecording()">
+                  <span id="record-btn-icon">●</span>
+                  <span id="record-btn-label">Start Recording</span>
+                </button>
+                <button class="btn btn-secondary" id="btn-discard-record" style="display: none;" onclick="discardRecording()">
+                  ✖ Discard
+                </button>
+              </div>
+              <p style="text-align: center; color: var(--text-muted); font-size: 0.85rem;" id="studio-hint">
+                Click Start to capture your microphone with real-time waveform.
+              </p>
+            </div>
+          </div>
+
+          <!-- Progressive Live Transcript & Scratchpad -->
+          <div style="display: flex; flex-direction: column; gap: 16px;">
+            <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 18px; flex: 1; display: flex; flex-direction: column;">
+              <h4 style="margin-bottom: 10px; font-size: 0.95rem;">Progressive Transcript</h4>
+              <div class="live-transcript-box" id="studio-transcript-box">
+                <span style="color: var(--text-muted); font-style: italic;">Live transcript will appear here as speech is detected...</span>
+              </div>
+            </div>
+
+            <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 18px; flex: 1; display: flex; flex-direction: column;">
+              <h4 style="margin-bottom: 10px; font-size: 0.95rem;">Live Scratchpad Notes</h4>
+              <textarea id="studio-scratchpad" placeholder="Take quick notes during the session..." style="flex: 1; background: var(--bg-app); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 12px; color: var(--text-primary); outline: none; resize: none; font-family: var(--font-sans);"></textarea>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================================================== -->
+      <!-- VIEW: IMPORT MEDIA                                    -->
+      <!-- ===================================================== -->
+      <section class="view-section" id="view-import">
+        <div style="max-width: 800px; margin: 0 auto;">
+          <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 32px; margin-bottom: 24px;">
+            <h2 style="font-size: 1.3rem; font-weight: 700; margin-bottom: 8px;">Upload Media File</h2>
+            <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 20px;">
+              Supports MP4, MKV, MOV, WebM, AVI, WAV, MP3. Audio track is extracted automatically via PyAV.
+            </p>
+
+            <!-- Drag & Drop Zone -->
+            <div id="drop-zone" style="border: 2px dashed var(--border-strong); border-radius: var(--radius-lg); padding: 40px 20px; text-align: center; cursor: pointer; transition: var(--transition); background: var(--bg-app);" onclick="document.getElementById('file-upload-input').click()">
+              <div style="margin-bottom: 12px; color: var(--accent-primary); display: flex; justify-content: center;">
+                <svg class="svg-icon svg-xl" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              </div>
+              <div style="font-weight: 600; font-size: 1.05rem; margin-bottom: 4px;">Click or drag & drop video/audio here</div>
+              <div style="color: var(--text-muted); font-size: 0.85rem;" id="selected-file-name">Up to 2GB file size</div>
+              <input type="file" id="file-upload-input" style="display: none;" accept="video/*,audio/*" onchange="handleFileSelect(this)">
+            </div>
+
+            <!-- Upload Details Form -->
+            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-top: 20px;">
+              <div>
+                <label style="display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 6px; color: var(--text-secondary);">Session Title</label>
+                <input type="text" id="import-title-input" placeholder="e.g. Distributed Systems Lecture 4" style="width: 100%; background: var(--bg-app); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 10px 14px; color: var(--text-primary); outline: none;">
+              </div>
+              <div>
+                <label style="display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 6px; color: var(--text-secondary);">Type</label>
+                <select id="import-type-select" style="width: 100%; background: var(--bg-app); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 10px 14px; color: var(--text-primary); outline: none;">
+                  <option value="lecture">Lecture</option>
+                  <option value="meeting">Meeting</option>
+                  <option value="video">Video</option>
+                  <option value="audio">Audio</option>
+                </select>
+              </div>
+            </div>
+
+            <button class="btn btn-primary" style="margin-top: 20px; width: 100%; padding: 12px;" onclick="uploadSelectedFile()">
+              Upload & Process Media
+            </button>
+          </div>
+
+          <!-- Public URL Importer -->
+          <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 32px;">
+            <h2 style="font-size: 1.3rem; font-weight: 700; margin-bottom: 8px;">Import Public Online Video / Audio</h2>
+            <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 16px;">
+              Enter a public URL (e.g. YouTube, direct video URL) to download and extract intelligence.
+            </p>
+            <div style="display: flex; gap: 12px;">
+              <input type="text" id="import-url-input" placeholder="https://www.youtube.com/watch?v=..." style="flex: 1; background: var(--bg-app); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 12px 16px; color: var(--text-primary); outline: none;">
+              <button class="btn btn-secondary" onclick="importFromUrl()">Fetch & Process</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================================================== -->
+      <!-- VIEW: LIBRARY                                         -->
+      <!-- ===================================================== -->
+      <section class="view-section" id="view-library">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+          <!-- Filter Tabs -->
+          <div class="tab-nav" style="border: none; background: none;">
+            <button class="tab-btn active" onclick="filterLibrary('all', this)">All Items</button>
+            <button class="tab-btn" onclick="filterLibrary('lecture', this)">Lectures</button>
+            <button class="tab-btn" onclick="filterLibrary('meeting', this)">Meetings</button>
+            <button class="tab-btn" onclick="filterLibrary('video', this)">Videos</button>
+            <button class="tab-btn" onclick="filterLibrary('audio', this)">Audio</button>
+          </div>
+
+          <!-- Library Search -->
+          <div style="display: flex; gap: 10px;">
+            <input type="text" id="library-search-input" placeholder="Filter library..." onkeyup="searchLibrary(this.value)" style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-full); padding: 8px 16px; color: var(--text-primary); outline: none; font-size: 0.88rem;">
+            <button class="btn btn-secondary" onclick="loadLibrary()">↻ Refresh</button>
+          </div>
+        </div>
+
+        <div class="items-grid" id="library-items-container">
+          <p style="color: var(--text-muted); font-size: 0.9rem;">Loading library...</p>
+        </div>
+      </section>
+
+      <!-- ===================================================== -->
+      <!-- VIEW: MEDIA & VIDEO WORKSPACE (3-PANE)                 -->
+      <!-- ===================================================== -->
+      <section class="view-section" id="view-video">
+        <!-- Smart Mode Header Banner -->
+        <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 12px 20px; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <span style="font-size: 0.78rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">Smart Mode:</span>
+            <span id="workspace-smart-badge" class="smart-badge tutorial">
+              <svg class="svg-icon svg-xs" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+              <span>Tutorial Mode</span>
+            </span>
+            <span id="workspace-smart-conf" style="font-size: 0.8rem; color: var(--text-muted);">(Auto-detected)</span>
+            <button class="btn btn-secondary" style="font-size: 0.75rem; padding: 4px 10px; display: flex; align-items: center; gap: 5px;" onclick="openChangeSmartModeModal()">
+              <svg class="svg-icon svg-xs" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+              <span>Change Mode</span>
+            </button>
+          </div>
+          <div style="display: flex; gap: 10px;">
+            <button class="btn btn-secondary" style="font-size: 0.82rem; display: flex; align-items: center; gap: 6px;" onclick="openExportModal()">
+              <svg class="svg-icon svg-xs" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              <span>Export Report</span>
+            </button>
+            <button class="btn btn-primary" style="font-size: 0.82rem; display: flex; align-items: center; gap: 6px;" onclick="navigateTo('transform')">
+              <svg class="svg-icon svg-xs" viewBox="0 0 24 24"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3z"/></svg>
+              <span>Magic Transform</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 3-Pane Responsive Layout -->
+        <div class="workspace-3pane">
+          <!-- Pane 1: Media Player & Speakers (Left) -->
+          <div class="pane-column">
+            <div class="pane-header">
+              <div class="pane-title" style="display: flex; align-items: center; gap: 6px;">
+                <svg class="svg-icon svg-sm" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><polygon points="10 8 16 11.5 10 15 10 8"/><line x1="2" y1="21" x2="22" y2="21"/></svg>
+                <span>Media Stream</span>
+              </div>
+              <select id="playback-speed-select" onchange="changePlaybackSpeed(this.value)" style="background: var(--bg-app); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 4px 8px; color: var(--text-primary); outline: none; font-size: 0.78rem;">
+                <option value="0.75">0.75x</option>
+                <option value="1.0" selected>1.0x</option>
+                <option value="1.25">1.25x</option>
+                <option value="1.5">1.5x</option>
+                <option value="2.0">2.0x</option>
+              </select>
+            </div>
+            <div class="pane-body" style="padding: 12px;">
+              <div class="video-container" id="video-player-container" style="border-radius: var(--radius-md); overflow: hidden; background: #000;">
+                <video id="main-video-player" controls preload="metadata" style="width: 100%; max-height: 220px;"></video>
+              </div>
+
+              <div class="audio-player-card" id="audio-player-container" style="display: none; padding: 20px 10px; text-align: center;">
+                <svg class="svg-icon svg-xl" viewBox="0 0 24 24" style="color: var(--accent-primary); margin-bottom: 8px;"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
+                <h4 id="audio-player-title" style="font-size: 0.95rem; margin-bottom: 10px;">Audio Recording</h4>
+                <audio id="main-audio-player" controls style="width: 100%;"></audio>
+              </div>
+
+              <!-- Session Title & Details -->
+              <div style="margin-top: 8px;">
+                <h3 id="current-item-title" style="font-size: 0.98rem; font-weight: 700; line-height: 1.4;">Select a session from Library</h3>
+                <span id="current-item-meta" style="font-size: 0.78rem; color: var(--text-muted);">No active session loaded</span>
+              </div>
+
+              <!-- Speakers Section -->
+              <div style="margin-top: 10px; border-top: 1px solid var(--border-subtle); padding-top: 10px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                  <span style="font-size: 0.8rem; font-weight: 700; color: var(--text-secondary); display: flex; align-items: center; gap: 6px;">
+                    <svg class="svg-icon svg-xs" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    <span>Speakers</span>
+                  </span>
+                  <span style="font-size: 0.72rem; color: var(--text-muted);" title="Click any speaker to rename">Click to edit</span>
+                </div>
+                <div id="workspace-speakers-list" style="display: flex; flex-wrap: wrap; gap: 6px;">
+                  <span class="speaker-pill" onclick="promptRenameSpeaker('Speaker 1')">Speaker 1</span>
+                </div>
+              </div>
+
+              <!-- Quick Timeline Chapters -->
+              <div style="margin-top: 10px; border-top: 1px solid var(--border-subtle); padding-top: 10px; flex: 1; overflow-y: auto;">
+                <span style="font-size: 0.8rem; font-weight: 700; color: var(--text-secondary); display: flex; align-items: center; gap: 6px; margin-bottom: 8px;">
+                  <svg class="svg-icon svg-xs" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  <span>Timeline Chapters</span>
+                </span>
+                <div id="workspace-chapters-list" style="display: flex; flex-direction: column; gap: 6px; font-size: 0.82rem;">
+                  <p style="color: var(--text-muted);">No chapters generated.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Pane 2: Synced Interactive Transcript (Center) -->
+          <div class="pane-column">
+            <div class="pane-header">
+              <div class="pane-title" style="display: flex; align-items: center; gap: 6px;">
+                <svg class="svg-icon svg-sm" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                <span>Synced Interactive Transcript</span>
+              </div>
+              <div style="display: flex; gap: 6px;">
+                <button class="btn btn-secondary" style="font-size: 0.75rem; padding: 4px 8px; display: flex; align-items: center; gap: 4px;" onclick="addBookmarkPrompt()">
+                  <svg class="svg-icon svg-xs" viewBox="0 0 24 24"><path d="m19 21-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+                  <span>Bookmark</span>
+                </button>
+                <button class="btn btn-secondary" style="font-size: 0.75rem; padding: 4px 8px; display: flex; align-items: center; gap: 4px;" onclick="copyActiveTranscript()">
+                  <svg class="svg-icon svg-xs" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                  <span>Copy</span>
+                </button>
+              </div>
+            </div>
+            <div style="padding: 10px 14px; border-bottom: 1px solid var(--border-subtle); background: var(--bg-app);">
+              <input type="text" id="transcript-filter-input" placeholder="Search spoken words in this video..." onkeyup="filterTranscriptSegments(this.value)" style="width: 100%; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 6px 12px; color: var(--text-primary); outline: none; font-size: 0.84rem;">
+            </div>
+            <div class="pane-body" style="padding: 10px;">
+              <div class="transcript-list" id="workspace-transcript-list" style="max-height: 100%;">
+                <p style="color: var(--text-muted); font-size: 0.88rem;">Load a session to see synced transcript.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Pane 3: Adaptive Smart Mode Intelligence & Q&A (Right) -->
+          <div class="pane-column intelligence-pane">
+            <div class="pane-header">
+              <div class="pane-title" style="display: flex; align-items: center; gap: 6px;">
+                <svg class="svg-icon svg-sm" viewBox="0 0 24 24"><path d="M12 2a8 8 0 0 0-8 8c0 3.37 2.08 6.25 5 7.42V20a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2v-2.58c2.92-1.17 5-4.05 5-7.42a8 8 0 0 0-8-8z"/><line x1="12" y1="9" x2="12" y2="13"/><circle cx="12" cy="17" r="1"/></svg>
+                <span>Intelligence & Insights</span>
+              </div>
+              <div class="tab-nav" style="border: none; background: none; gap: 4px;">
+                <button class="tab-btn active" style="font-size: 0.78rem; padding: 4px 8px;" onclick="switchWorkspaceTab('summary', this)">Insights</button>
+                <button class="tab-btn" style="font-size: 0.78rem; padding: 4px 8px;" onclick="switchWorkspaceTab('chat', this)">Ask AI</button>
+                <button class="tab-btn" style="font-size: 0.78rem; padding: 4px 8px;" onclick="switchWorkspaceTab('actions', this)">Actions</button>
+                <button class="tab-btn" style="font-size: 0.78rem; padding: 4px 8px;" onclick="switchWorkspaceTab('bookmarks', this)">Saved</button>
+              </div>
+            </div>
+            <div class="pane-body" id="workspace-intelligence-body">
+              <!-- Tab A: Smart Mode Adaptive Insights -->
+              <div id="tab-content-summary" style="display: flex; flex-direction: column; gap: 14px;">
+                <div>
+                  <h4 style="font-size: 0.88rem; font-weight: 700; margin-bottom: 4px; color: var(--accent-secondary);">Overview Summary</h4>
+                  <div id="workspace-summary-box" style="font-size: 0.88rem; line-height: 1.6; color: var(--text-primary); background: var(--bg-app); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 12px;">No summary generated yet.</div>
+                </div>
+                <!-- Dynamic Mode Sections Container -->
+                <div id="workspace-custom-sections-container" style="display: flex; flex-direction: column; gap: 12px;"></div>
+                <div>
+                  <h4 style="font-size: 0.88rem; font-weight: 700; margin-bottom: 4px; color: var(--status-success);">Key Concepts & Decisions</h4>
+                  <div id="workspace-keypoints-box" style="font-size: 0.88rem; line-height: 1.6; color: var(--text-primary); background: var(--bg-app); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 12px;">No key points recorded.</div>
+                </div>
+              </div>
+
+              <!-- Tab B: Embedded Ask SmartScribe Drawer -->
+              <div id="tab-content-chat" style="display: none; flex-direction: column; height: 100%;">
+                <div id="workspace-mini-chat-box" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; min-height: 280px; padding-bottom: 10px;">
+                  <div class="chat-bubble assistant" style="font-size: 0.84rem; padding: 10px 14px;">
+                    Ask anything about this session. Answers are grounded in the transcript with timestamp links!
+                  </div>
+                </div>
+                <div style="display: flex; gap: 6px; margin-top: 8px;">
+                  <input type="text" id="workspace-mini-chat-input" placeholder="Ask question..." onkeydown="if (event.key === 'Enter') sendMiniChatMessage()" style="flex: 1; background: var(--bg-app); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 8px 12px; color: var(--text-primary); outline: none; font-size: 0.82rem;">
+                  <button class="btn btn-primary" style="padding: 6px 12px; font-size: 0.82rem;" onclick="sendMiniChatMessage()">Ask</button>
+                </div>
+              </div>
+
+              <!-- Tab C: Action Items -->
+              <div id="tab-content-actions" style="display: none; flex-direction: column; gap: 8px;">
+                <div id="workspace-actions-list" style="display: flex; flex-direction: column; gap: 8px;">
+                  <p style="color: var(--text-muted); font-size: 0.88rem;">No action items detected.</p>
+                </div>
+              </div>
+
+              <!-- Tab D: Bookmarks -->
+              <div id="tab-content-bookmarks" style="display: none; flex-direction: column; gap: 8px;">
+                <div id="workspace-bookmarks-list" style="display: flex; flex-direction: column; gap: 8px;">
+                  <p style="color: var(--text-muted); font-size: 0.88rem;">No bookmarks saved for this session.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================================================== -->
+      <!-- VIEW: STUDY MODE (FLASHCARDS & QUIZZES)               -->
+      <!-- ===================================================== -->
+      <section class="view-section" id="view-study">
+        <div class="study-deck-container">
+          <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; margin-bottom: 20px;">
+            <div>
+              <h2 style="font-size: 1.4rem; font-weight: 800;">Interactive Study Mode</h2>
+              <span id="study-session-name" style="color: var(--text-muted); font-size: 0.88rem;">Select a lecture to study</span>
+            </div>
+            <button class="btn btn-primary" style="display: flex; align-items: center; gap: 6px;" onclick="generateStudySetForActiveItem()">
+              <svg class="svg-icon svg-xs" viewBox="0 0 24 24"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3z"/></svg>
+              <span>Generate Study Set</span>
+            </button>
+          </div>
+
+          <!-- Study Navigation Tabs -->
+          <div class="tab-nav" style="margin-bottom: 20px;">
+            <button class="tab-btn active" style="display: flex; align-items: center; gap: 6px;" onclick="switchStudyTab('flashcards', this)">
+              <svg class="svg-icon svg-xs" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><line x1="6" y1="8" x2="18" y2="8"/><line x1="6" y1="12" x2="14" y2="12"/></svg>
+              <span>3D Flashcards</span>
+            </button>
+            <button class="tab-btn" style="display: flex; align-items: center; gap: 6px;" onclick="switchStudyTab('quiz', this)">
+              <svg class="svg-icon svg-xs" viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+              <span>Practice Quiz</span>
+            </button>
+            <button class="tab-btn" style="display: flex; align-items: center; gap: 6px;" onclick="switchStudyTab('cram', this)">
+              <svg class="svg-icon svg-xs" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              <span>Exam Cram Sheet</span>
+            </button>
+          </div>
+
+          <!-- Subtab: 3D Flashcards -->
+          <div id="study-subtab-flashcards" style="width: 100%;">
+            <div class="flashcard-wrapper" id="main-flashcard" onclick="flipActiveCard()">
+              <div class="flashcard-inner">
+                <div class="flashcard-front">
+                  <span class="flashcard-prompt-label">QUESTION (Click to reveal answer)</span>
+                  <div class="flashcard-text" id="flashcard-front-text">Load a lecture to practice flashcards.</div>
+                </div>
+                <div class="flashcard-back">
+                  <span class="flashcard-prompt-label" style="color: var(--status-success);">EXPLANATION / ANSWER</span>
+                  <div class="flashcard-text" id="flashcard-back-text">Click the card to flip back.</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Flashcard Nav Controls -->
+            <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+              <button class="btn btn-secondary" onclick="prevFlashcard()">← Previous</button>
+              <span id="flashcard-counter" style="font-weight: 600; font-size: 0.9rem;">0 / 0</span>
+              <button class="btn btn-primary" onclick="nextFlashcard()">Next Card →</button>
+            </div>
+          </div>
+
+          <!-- Subtab: Practice Quiz -->
+          <div id="study-subtab-quiz" class="quiz-container" style="display: none; width: 100%;">
+            <div id="quiz-questions-list">
+              <p style="color: var(--text-muted); font-size: 0.9rem;">No quiz generated for this lecture yet. Click 'Generate Study Set' above.</p>
+            </div>
+          </div>
+
+          <!-- Subtab: Exam Cram Sheet -->
+          <div id="study-subtab-cram" style="display: none; width: 100%; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 24px;">
+            <h3 style="margin-bottom: 14px; font-size: 1.1rem; color: var(--accent-secondary);">High-Yield Exam Concepts</h3>
+            <ul id="cram-sheet-list" style="padding-left: 20px; line-height: 1.8; font-size: 0.95rem;">
+              <li style="color: var(--text-muted);">No cram sheet points available.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================================================== -->
+      <!-- VIEW: ASK SMARTSCRIBE (AI CHAT)                       -->
+      <!-- ===================================================== -->
+      <section class="view-section" id="view-chat">
+        <div class="chat-workspace">
+          <!-- Chat Header -->
+          <div style="padding: 14px 20px; border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between;">
+            <div>
+              <h3 style="font-size: 1.05rem; font-weight: 700;">Ask SmartScribe</h3>
+              <span id="chat-active-item-title" style="font-size: 0.8rem; color: var(--text-muted);">Grounding answers in active transcript</span>
+            </div>
+            <button class="btn btn-secondary" onclick="clearChatHistory()">Clear Chat</button>
+          </div>
+
+          <!-- Quick Preset Chips -->
+          <div style="padding: 8px 16px; border-bottom: 1px solid var(--border-subtle); display: flex; gap: 8px; overflow-x: auto; background: var(--bg-app);">
+            <button class="btn btn-secondary" style="font-size: 0.78rem; padding: 4px 10px; display: flex; align-items: center; gap: 5px;" onclick="sendPresetPrompt('Summarize the 3 main takeaways with timestamps.')">
+              <svg class="svg-icon svg-xs" viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+              <span>3 Main Takeaways</span>
+            </button>
+            <button class="btn btn-secondary" style="font-size: 0.78rem; padding: 4px 10px; display: flex; align-items: center; gap: 5px;" onclick="sendPresetPrompt('What explicit action items and deadlines were discussed?')">
+              <svg class="svg-icon svg-xs" viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+              <span>Action Items</span>
+            </button>
+            <button class="btn btn-secondary" style="font-size: 0.78rem; padding: 4px 10px; display: flex; align-items: center; gap: 5px;" onclick="sendPresetPrompt('Explain the key concept in simple beginner terms.')">
+              <svg class="svg-icon svg-xs" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+              <span>Explain Simply</span>
+            </button>
+            <button class="btn btn-secondary" style="font-size: 0.78rem; padding: 4px 10px; display: flex; align-items: center; gap: 5px;" onclick="sendPresetPrompt('Generate 3 tricky interview or exam questions from this.')">
+              <svg class="svg-icon svg-xs" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              <span>Practice Questions</span>
+            </button>
+          </div>
+
+          <!-- Messages Stream -->
+          <div class="chat-messages-container" id="chat-messages-box">
+            <div class="chat-bubble assistant">
+              Hello! I am SmartScribe AI. Ask me anything about this lecture or meeting transcript. I will ground my answers strictly in the content and cite exact timestamps.
+            </div>
+          </div>
+
+          <!-- Input Bar -->
+          <div class="chat-input-bar">
+            <input type="text" class="chat-input" id="chat-user-input" placeholder="Ask a question about this session... (e.g. 'What did they say about normalization?')" onkeydown="if (event.key === 'Enter') sendChatMessage()">
+            <button class="btn btn-primary" onclick="sendChatMessage()">Send</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================================================== -->
+      <!-- VIEW: MAGIC TRANSFORM STUDIO                          -->
+      <!-- ===================================================== -->
+      <section class="view-section" id="view-transform">
+        <div style="max-width: 950px; margin: 0 auto;">
+          <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 24px; margin-bottom: 20px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
+              <div>
+                <h2 style="font-size: 1.35rem; font-weight: 800; display: flex; align-items: center; gap: 8px;">
+                  <svg class="svg-icon svg-md" viewBox="0 0 24 24" style="color: var(--accent-primary);"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3z"/></svg>
+                  <span>Magic Transform Studio</span>
+                </h2>
+                <p style="color: var(--text-secondary); font-size: 0.88rem;">
+                  Repurpose any video, lecture, or meeting into executive memos, study packs, YouTube scripts, or action checklists.
+                </p>
+              </div>
+              <span id="transform-active-item-title" class="type-badge type-video" style="font-size: 0.82rem;">Select session from Library</span>
+            </div>
+
+            <!-- 4 Domain Tabs -->
+            <div class="tab-nav" style="margin-bottom: 16px;">
+              <button class="tab-btn active" style="display: flex; align-items: center; gap: 6px;" onclick="switchTransformDomain('understand', this)">
+                <svg class="svg-icon svg-xs" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                <span>UNDERSTAND</span>
+              </button>
+              <button class="tab-btn" style="display: flex; align-items: center; gap: 6px;" onclick="switchTransformDomain('learn', this)">
+                <svg class="svg-icon svg-xs" viewBox="0 0 24 24"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
+                <span>LEARN</span>
+              </button>
+              <button class="tab-btn" style="display: flex; align-items: center; gap: 6px;" onclick="switchTransformDomain('create', this)">
+                <svg class="svg-icon svg-xs" viewBox="0 0 24 24"><polygon points="14 2 18 6 7 17 3 17 3 13 14 2"/></svg>
+                <span>CREATE</span>
+              </button>
+              <button class="tab-btn" style="display: flex; align-items: center; gap: 6px;" onclick="switchTransformDomain('act', this)">
+                <svg class="svg-icon svg-xs" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                <span>ACT</span>
+              </button>
+            </div>
+
+            <!-- Domain 1: UNDERSTAND Cards -->
+            <div id="domain-understand" class="transform-grid">
+              <div class="transform-card" onclick="selectTransformFormat('executive_briefing', this)">
+                <div class="transform-icon-box">
+                  <svg class="svg-icon svg-md" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                </div>
+                <div class="transform-title">Executive Briefing</div>
+                <div class="transform-desc">1-page leadership memo with Purpose, Findings, Strategic Implications, and Next Steps.</div>
+              </div>
+              <div class="transform-card" onclick="selectTransformFormat('detailed_outline', this)">
+                <div class="transform-icon-box">
+                  <svg class="svg-icon svg-md" viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                </div>
+                <div class="transform-title">Detailed Outline</div>
+                <div class="transform-desc">Hierarchical Roman numeral outline (I, II, A, B) mapping the full core structure.</div>
+              </div>
+              <div class="transform-card" onclick="selectTransformFormat('chronological_timeline', this)">
+                <div class="transform-icon-box">
+                  <svg class="svg-icon svg-md" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                </div>
+                <div class="transform-title">Chronological Timeline</div>
+                <div class="transform-desc">Detailed step-by-step milestone progression with precise timestamps.</div>
+              </div>
+            </div>
+
+            <!-- Domain 2: LEARN Cards -->
+            <div id="domain-learn" class="transform-grid" style="display: none;">
+              <div class="transform-card" onclick="selectTransformFormat('study_guide', this)">
+                <div class="transform-icon-box">
+                  <svg class="svg-icon svg-md" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                </div>
+                <div class="transform-title">Academic Study Guide</div>
+                <div class="transform-desc">Textbook-style chapter notes with conceptual summaries and self-test prompts.</div>
+              </div>
+              <div class="transform-card" onclick="selectTransformFormat('flashcard_deck', this)">
+                <div class="transform-icon-box">
+                  <svg class="svg-icon svg-md" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><line x1="6" y1="8" x2="18" y2="8"/><line x1="6" y1="12" x2="14" y2="12"/></svg>
+                </div>
+                <div class="transform-title">Flashcard Deck</div>
+                <div class="transform-desc">High-yield question & answer pairs built for spaced repetition study.</div>
+              </div>
+              <div class="transform-card" onclick="selectTransformFormat('practice_test', this)">
+                <div class="transform-icon-box">
+                  <svg class="svg-icon svg-md" viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                </div>
+                <div class="transform-title">Practice Test</div>
+                <div class="transform-desc">5 challenging multiple-choice questions with answer keys and rationale.</div>
+              </div>
+            </div>
+
+            <!-- Domain 3: CREATE Cards -->
+            <div id="domain-create" class="transform-grid" style="display: none;">
+              <div class="transform-card" onclick="selectTransformFormat('youtube_script', this)">
+                <div class="transform-icon-box">
+                  <svg class="svg-icon svg-md" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><polygon points="10 8 16 11.5 10 15 10 8"/></svg>
+                </div>
+                <div class="transform-title">YouTube Script</div>
+                <div class="transform-desc">High-retention video script with 5s Hook, Intro, 3-Act Body, and Call to Action.</div>
+              </div>
+              <div class="transform-card" onclick="selectTransformFormat('presentation_notes', this)">
+                <div class="transform-icon-box">
+                  <svg class="svg-icon svg-md" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+                </div>
+                <div class="transform-title">Slide Talking Points</div>
+                <div class="transform-desc">Speaker notes with slide cues, transition prompts, and spoken reminders.</div>
+              </div>
+              <div class="transform-card" onclick="selectTransformFormat('article', this)">
+                <div class="transform-icon-box">
+                  <svg class="svg-icon svg-md" viewBox="0 0 24 24"><path d="M19 20H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v1m2 13a2 2 0 0 1-2-2V7m2 13a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-2"/></svg>
+                </div>
+                <div class="transform-title">Publication Article</div>
+                <div class="transform-desc">Polished Substack / blog article with subheads, key takeaways, and conclusion.</div>
+              </div>
+              <div class="transform-card" onclick="selectTransformFormat('social_reel', this)">
+                <div class="transform-icon-box">
+                  <svg class="svg-icon svg-md" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+                </div>
+                <div class="transform-title">60s Reel / TikTok Script</div>
+                <div class="transform-desc">Punchy, fast-paced script designed for high viral mobile engagement.</div>
+              </div>
+            </div>
+
+            <!-- Domain 4: ACT Cards -->
+            <div id="domain-act" class="transform-grid" style="display: none;">
+              <div class="transform-card" onclick="selectTransformFormat('action_checklist', this)">
+                <div class="transform-icon-box">
+                  <svg class="svg-icon svg-md" viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                </div>
+                <div class="transform-title">Action Items Checklist</div>
+                <div class="transform-desc">Prioritized markdown checklist (- [ ] task) with accountability criteria.</div>
+              </div>
+              <div class="transform-card" onclick="selectTransformFormat('follow_up_email', this)">
+                <div class="transform-icon-box">
+                  <svg class="svg-icon svg-md" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                </div>
+                <div class="transform-title">Follow-Up Email</div>
+                <div class="transform-desc">Polite, executive email summarizing the discussion and next steps to send to participants.</div>
+              </div>
+              <div class="transform-card" onclick="selectTransformFormat('meeting_memo', this)">
+                <div class="transform-icon-box">
+                  <svg class="svg-icon svg-md" viewBox="0 0 24 24"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+                </div>
+                <div class="transform-title">Stakeholder Memo</div>
+                <div class="transform-desc">Formal memo summarizing status, key decisions, resource needs, and risks.</div>
+              </div>
+            </div>
+
+            <!-- Transform Controls -->
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 20px; flex-wrap: wrap; gap: 12px; border-top: 1px solid var(--border-subtle); padding-top: 16px;">
+              <div style="display: flex; gap: 12px; align-items: center;">
+                <span style="font-size: 0.85rem; color: var(--text-muted);">Tone:</span>
+                <select id="transform-tone-select" style="background: var(--bg-app); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 6px 10px; color: var(--text-primary); outline: none; font-size: 0.84rem;">
+                  <option value="professional">Professional & Direct</option>
+                  <option value="educational">Educational & Clear</option>
+                  <option value="engaging">Engaging & Dynamic</option>
+                  <option value="persuasive">Persuasive</option>
+                </select>
+                <span style="font-size: 0.85rem; color: var(--text-muted); margin-left: 6px;">Length:</span>
+                <select id="transform-length-select" style="background: var(--bg-app); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 6px 10px; color: var(--text-primary); outline: none; font-size: 0.84rem;">
+                  <option value="concise">Concise (~300 words)</option>
+                  <option value="medium" selected>Standard (~600 words)</option>
+                  <option value="detailed">In-Depth (~900+ words)</option>
+                </select>
+              </div>
+
+              <button class="btn btn-primary" id="transform-submit-btn" onclick="executeMagicTransform()">
+                ✨ Transform Active Session
+              </button>
+            </div>
+          </div>
+
+          <!-- Transformed Output Card -->
+          <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 24px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+              <h3 id="transform-output-title" style="font-size: 1.1rem; font-weight: 700;">Transformed Deliverable</h3>
+              <div style="display: flex; gap: 8px;">
+                <button class="btn btn-secondary" style="display: flex; align-items: center; gap: 5px;" onclick="copyTransformOutput()">
+                  <svg class="svg-icon svg-xs" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                  <span>Copy</span>
+                </button>
+                <button class="btn btn-secondary" style="display: flex; align-items: center; gap: 5px;" onclick="saveTransformAsNote()">
+                  <svg class="svg-icon svg-xs" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                  <span>Save as Note</span>
+                </button>
+              </div>
+            </div>
+            <div id="transform-output-box" style="background: var(--bg-app); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 20px; min-height: 220px; font-size: 0.95rem; line-height: 1.7; white-space: pre-wrap;">
+              Select a format card above and click 'Transform Active Session' to generate customized knowledge.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================================================== -->
+      <!-- VIEW: "FIND IT" GLOBAL DEEP SEARCH                    -->
+      <!-- ===================================================== -->
+      <section class="view-section" id="view-search">
+        <div style="max-width: 900px; margin: 0 auto;">
+          <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 24px; margin-bottom: 20px;">
+            <h2 style="font-size: 1.35rem; font-weight: 800; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+              <svg class="svg-icon svg-md" viewBox="0 0 24 24" style="color: var(--accent-primary);"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <span>"Find It" Global Deep Search</span>
+            </h2>
+            <p style="color: var(--text-secondary); font-size: 0.88rem; margin-bottom: 18px;">
+              Search across all transcripts, spoken words, summaries, notes, and action items in your library.
+            </p>
+
+            <div style="display: flex; gap: 10px; margin-bottom: 14px;">
+              <input type="text" id="deep-search-input" placeholder="Search words spoken, e.g. 'normalization', 'deadline', 'Duolingo'..." onkeydown="if (event.key === 'Enter') executeDeepSearch()" style="flex: 1; background: var(--bg-app); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 12px 16px; color: var(--text-primary); outline: none; font-size: 0.95rem;">
+              <button class="btn btn-primary" style="padding: 0 24px; display: flex; align-items: center; gap: 6px;" onclick="executeDeepSearch()">
+                <svg class="svg-icon svg-xs" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <span>Search</span>
+              </button>
+            </div>
+
+            <!-- Filter Tabs -->
+            <div class="tab-nav" style="border: none; background: none; gap: 6px;">
+              <button class="tab-btn active" onclick="setDeepSearchFilter('all', this)">All Results</button>
+              <button class="tab-btn" onclick="setDeepSearchFilter('lecture', this)">Lectures</button>
+              <button class="tab-btn" onclick="setDeepSearchFilter('meeting', this)">Meetings</button>
+              <button class="tab-btn" onclick="setDeepSearchFilter('video', this)">Videos</button>
+              <button class="tab-btn" onclick="setDeepSearchFilter('tutorial', this)">Tutorials</button>
+            </div>
+          </div>
+
+          <!-- Deep Search Results Box -->
+          <div id="deep-search-results-box" style="display: flex; flex-direction: column; gap: 12px;">
+            <p style="color: var(--text-muted); font-size: 0.9rem; text-align: center; padding: 30px;">
+              Type a term above to search across every spoken second of your media library.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================================================== -->
+      <!-- VIEW: "TEACH ME" SOCRATIC AI TUTOR                    -->
+      <!-- ===================================================== -->
+      <section class="view-section" id="view-teach">
+        <div style="max-width: 820px; margin: 0 auto;">
+          <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 24px; margin-bottom: 20px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+              <div>
+                <h2 style="font-size: 1.35rem; font-weight: 800; display: flex; align-items: center; gap: 8px;">
+                  <svg class="svg-icon svg-md" viewBox="0 0 24 24" style="color: var(--accent-secondary);"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+                  <span>"Teach Me" Socratic Tutor</span>
+                </h2>
+                <p style="color: var(--text-secondary); font-size: 0.88rem;">
+                  Interactive learning session. SmartScribe explains concepts from the active lecture and checks your understanding.
+                </p>
+              </div>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <span style="font-size: 0.82rem; color: var(--text-muted);">Level:</span>
+                <select id="teach-level-select" style="background: var(--bg-app); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 6px 10px; color: var(--text-primary); outline: none; font-size: 0.82rem;">
+                  <option value="beginner" selected>Beginner</option>
+                  <option value="intermediate">Intermediate</option>
+                  <option value="advanced">Advanced</option>
+                </select>
+                <button class="btn btn-primary" onclick="startTeachSession()">Start Lesson</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tutor Dialogue Stream -->
+          <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 20px; min-height: 380px; display: flex; flex-direction: column;">
+            <div id="teach-messages-box" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px;">
+              <div class="chat-bubble assistant">
+                Welcome to Teach Me! Choose your difficulty level and click <strong>Start Lesson</strong>. I will teach you the concepts step by step and ask questions along the way.
+              </div>
+            </div>
+
+            <div style="display: flex; gap: 8px;">
+              <input type="text" id="teach-user-input" placeholder="Type your answer to the tutor's question..." onkeydown="if (event.key === 'Enter') submitTeachAnswer()" style="flex: 1; background: var(--bg-app); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 10px 14px; color: var(--text-primary); outline: none; font-size: 0.9rem;">
+              <button class="btn btn-primary" onclick="submitTeachAnswer()">Submit Answer</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================================================== -->
+      <!-- VIEW: SPEAKING & PRESENTATION COACH                   -->
+      <!-- ===================================================== -->
+      <section class="view-section" id="view-coach">
+        <div style="max-width: 900px; margin: 0 auto;">
+          <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 24px; margin-bottom: 20px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+              <div>
+                <h2 style="font-size: 1.35rem; font-weight: 800; display: flex; align-items: center; gap: 8px;">
+                  <svg class="svg-icon svg-md" viewBox="0 0 24 24" style="color: var(--accent-emerald);"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                  <span>Speaking & Presentation Coach</span>
+                </h2>
+                <p style="color: var(--text-secondary); font-size: 0.88rem;">
+                  SmartScribe analyzes speaking pacing (WPM), filler words ("um", "like"), and delivery flow.
+                </p>
+              </div>
+              <button class="btn btn-primary" style="display: flex; align-items: center; gap: 6px;" onclick="analyzeActiveSessionWithCoach()">
+                <svg class="svg-icon svg-xs" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                <span>Analyze Active Video</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Coach Metrics Grid -->
+          <div class="coach-metrics-grid" id="coach-metrics-container">
+            <div class="coach-metric-card">
+              <span class="coach-metric-sub">Speaking Pace</span>
+              <div class="coach-metric-val" id="coach-wpm-val">-- WPM</div>
+              <span class="coach-metric-sub" id="coach-pace-status">Target: 130–160 WPM</span>
+            </div>
+            <div class="coach-metric-card">
+              <span class="coach-metric-sub">Filler Words</span>
+              <div class="coach-metric-val" id="coach-fillers-val">--</div>
+              <span class="coach-metric-sub" id="coach-fillers-breakdown">um, uh, like, you know</span>
+            </div>
+            <div class="coach-metric-card">
+              <span class="coach-metric-sub">Total Duration</span>
+              <div class="coach-metric-val" id="coach-duration-val">--:--</div>
+              <span class="coach-metric-sub" id="coach-words-count">Total spoken words</span>
+            </div>
+          </div>
+
+          <!-- AI Coach Feedback Card -->
+          <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 24px; margin-bottom: 20px;">
+            <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 12px; color: var(--accent-secondary);">AI Delivery Critique & Recommendations</h3>
+            <div id="coach-feedback-box" style="background: var(--bg-app); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 18px; line-height: 1.7; font-size: 0.95rem; white-space: pre-wrap;">
+              Click 'Analyze Active Video' above to get instant feedback on delivery, structure, and pacing.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================================================== -->
+      <!-- VIEW: WORKSPACES MANAGER                              -->
+      <!-- ===================================================== -->
+      <section class="view-section" id="view-workspaces">
+        <div style="max-width: 900px; margin: 0 auto;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+            <div>
+              <h2 style="font-size: 1.35rem; font-weight: 800; display: flex; align-items: center; gap: 8px;">
+                <svg class="svg-icon svg-md" viewBox="0 0 24 24" style="color: var(--accent-violet);"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+                <span>Knowledge Workspaces</span>
+              </h2>
+              <p style="color: var(--text-secondary); font-size: 0.88rem;">
+                Organize your lectures, team meetings, and research into dedicated workspaces.
+              </p>
+            </div>
+            <button class="btn btn-primary" onclick="openNewWorkspaceModal()">+ New Workspace</button>
+          </div>
+
+          <div class="items-grid" id="workspaces-grid-box">
+            <p style="color: var(--text-muted); font-size: 0.9rem;">Loading workspaces...</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================================================== -->
+      <!-- VIEW: SMART NOTES                                     -->
+      <!-- ===================================================== -->
+      <section class="view-section" id="view-notes">
+        <div style="display: grid; grid-template-columns: 280px 1fr; gap: 20px; height: calc(100vh - 120px);">
+          <!-- Notes List -->
+          <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 16px; display: flex; flex-direction: column;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
+              <h3 style="font-size: 1.05rem; font-weight: 700;">All Notes</h3>
+              <button class="btn btn-primary" style="padding: 4px 10px; font-size: 0.8rem;" onclick="createNewNote()">+ New</button>
+            </div>
+            <div id="notes-sidebar-list" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;">
+              <p style="color: var(--text-muted); font-size: 0.88rem;">Loading notes...</p>
+            </div>
+          </div>
+
+          <!-- Note Editor -->
+          <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 24px; display: flex; flex-direction: column;">
+            <input type="text" id="note-editor-title" placeholder="Note Title..." style="background: none; border: none; font-size: 1.4rem; font-weight: 800; color: var(--text-primary); outline: none; margin-bottom: 16px;">
+            <textarea id="note-editor-content" placeholder="Start writing your thoughts, ideas, or study insights..." style="flex: 1; background: var(--bg-app); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 16px; color: var(--text-primary); outline: none; resize: none; font-size: 1rem; line-height: 1.6;"></textarea>
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 16px;">
+              <button class="btn btn-danger" onclick="deleteActiveNote()">Delete Note</button>
+              <button class="btn btn-primary" onclick="saveActiveNote()">Save Note</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================================================== -->
+      <!-- VIEW: PROCESSING QUEUE                                -->
+      <!-- ===================================================== -->
+      <section class="view-section" id="view-jobs">
+        <div style="max-width: 950px; margin: 0 auto;">
+          <div class="section-header">
+            <h2>Background Processing Center</h2>
+            <button class="btn btn-secondary" onclick="loadJobs()">↻ Refresh Queue</button>
+          </div>
+
+          <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); overflow: hidden;">
+            <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem;">
+              <thead style="background: var(--bg-surface-hover); border-bottom: 1px solid var(--border-subtle); color: var(--text-secondary);">
+                <tr>
+                  <th style="padding: 12px 16px;">Item</th>
+                  <th style="padding: 12px 16px;">Stage</th>
+                  <th style="padding: 12px 16px; width: 30%;">Progress</th>
+                  <th style="padding: 12px 16px;">Status</th>
+                  <th style="padding: 12px 16px; text-align: right;">Action</th>
+                </tr>
+              </thead>
+              <tbody id="jobs-table-body">
+                <tr>
+                  <td colspan="5" style="padding: 24px; text-align: center; color: var(--text-muted);">No background tasks logged.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================================================== -->
+      <!-- VIEW: SETTINGS                                        -->
+      <!-- ===================================================== -->
+      <section class="view-section" id="view-settings">
+        <div style="max-width: 750px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px;">
+          <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 24px;">
+            <h3 style="font-size: 1.15rem; font-weight: 700; margin-bottom: 12px;">Local Intelligence Engines</h3>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; font-size: 0.9rem;">
+              <div>
+                <span style="color: var(--text-muted); display: block; font-size: 0.8rem;">Speech Recognition</span>
+                <strong>Faster-Whisper (base, int8)</strong>
+              </div>
+              <div>
+                <span style="color: var(--text-muted); display: block; font-size: 0.8rem;">Reasoning Model</span>
+                <strong>Local Qwen GGUF (~2.0 GB)</strong>
+              </div>
+              <div>
+                <span style="color: var(--text-muted); display: block; font-size: 0.8rem;">CPU Thread Allocation</span>
+                <strong id="settings-threads-val">8 Cores active</strong>
+              </div>
+              <div>
+                <span style="color: var(--text-muted); display: block; font-size: 0.8rem;">Inference Hardware</span>
+                <strong id="settings-device-val">CPU</strong>
+              </div>
+            </div>
+          </div>
+
+          <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 24px;">
+            <h3 style="font-size: 1.15rem; font-weight: 700; margin-bottom: 12px;">Privacy & Local Storage</h3>
+            <p style="color: var(--text-secondary); font-size: 0.9rem; line-height: 1.6; margin-bottom: 14px;">
+              SmartScribe is built with a local-first privacy architecture. All media, transcripts, and model weights reside exclusively on your machine.
+            </p>
+            <div style="font-family: var(--font-mono); font-size: 0.8rem; background: var(--bg-app); padding: 10px; border-radius: var(--radius-sm);">
+              Database: data/smartscribe.db<br>
+              Recordings: recordings/
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+</div>
+
+<!-- ========================================================= -->
+<!-- COMMAND PALETTE MODAL (Ctrl + K)                          -->
+<!-- ========================================================= -->
+<div class="modal-backdrop" id="command-modal-backdrop" onclick="if (event.target === this) closeCommandPalette()">
+  <div class="command-modal">
+    <div class="command-input-wrapper">
+      <svg class="svg-icon svg-sm" viewBox="0 0 24 24" style="color: var(--text-muted); margin-right: 10px;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" class="command-input" id="command-palette-input" placeholder="Type a command, session title, or keyword..." onkeyup="handleCommandSearch(this.value)">
+      <span class="kbd-shortcut">ESC</span>
+    </div>
+    <div class="command-results-list" id="command-results-box">
+      <!-- Injected dynamically -->
+    </div>
+  </div>
+</div>
+
+<!-- ========================================================= -->
+<!-- CHANGE SMART MODE MODAL                                   -->
+<!-- ========================================================= -->
+<div class="modal-backdrop" id="smart-mode-modal" style="display: none;" onclick="if (event.target === this) closeSmartModeModal()">
+  <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 24px; max-width: 480px; width: 90%; box-shadow: var(--shadow-lg);">
+    <h3 style="font-size: 1.15rem; font-weight: 700; margin-bottom: 6px;">Select Smart Mode</h3>
+    <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 16px;">
+      Choose the intelligence lens to view and analyze this media session.
+    </p>
+    <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px;">
+      <label class="speaker-pill" style="padding: 10px 14px; border-radius: var(--radius-md); display: flex; align-items: center; gap: 10px; cursor: pointer;">
+        <input type="radio" name="smart_mode_choice" value="lecture">
+        <svg class="svg-icon svg-xs" viewBox="0 0 24 24" style="color: #818cf8;"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
+        <span><strong>Lecture Mode</strong> (Concepts, Formulas, Exam Points)</span>
+      </label>
+      <label class="speaker-pill" style="padding: 10px 14px; border-radius: var(--radius-md); display: flex; align-items: center; gap: 10px; cursor: pointer;">
+        <input type="radio" name="smart_mode_choice" value="meeting">
+        <svg class="svg-icon svg-xs" viewBox="0 0 24 24" style="color: #34d399;"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+        <span><strong>Meeting Mode</strong> (Decisions, Action Items, Deadlines)</span>
+      </label>
+      <label class="speaker-pill" style="padding: 10px 14px; border-radius: var(--radius-md); display: flex; align-items: center; gap: 10px; cursor: pointer;">
+        <input type="radio" name="smart_mode_choice" value="podcast">
+        <svg class="svg-icon svg-xs" viewBox="0 0 24 24" style="color: #fbbf24;"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
+        <span><strong>Podcast Mode</strong> (Guest Insights, Core Arguments, Quotes)</span>
+      </label>
+      <label class="speaker-pill" style="padding: 10px 14px; border-radius: var(--radius-md); display: flex; align-items: center; gap: 10px; cursor: pointer;">
+        <input type="radio" name="smart_mode_choice" value="interview">
+        <svg class="svg-icon svg-xs" viewBox="0 0 24 24" style="color: #f472b6;"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <span><strong>Interview Mode</strong> (Questions, Candidate Answers, Evaluation)</span>
+      </label>
+      <label class="speaker-pill" style="padding: 10px 14px; border-radius: var(--radius-md); display: flex; align-items: center; gap: 10px; cursor: pointer;">
+        <input type="radio" name="smart_mode_choice" value="tutorial">
+        <svg class="svg-icon svg-xs" viewBox="0 0 24 24" style="color: #22d3ee;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        <span><strong>Tutorial Mode</strong> (Steps, Commands/Code, Pitfalls)</span>
+      </label>
+      <label class="speaker-pill" style="padding: 10px 14px; border-radius: var(--radius-md); display: flex; align-items: center; gap: 10px; cursor: pointer;">
+        <input type="radio" name="smart_mode_choice" value="presentation">
+        <svg class="svg-icon svg-xs" viewBox="0 0 24 24" style="color: #c084fc;"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+        <span><strong>Presentation Mode</strong> (Theses, Slide Outlines, Cues)</span>
+      </label>
+      <label class="speaker-pill" style="padding: 10px 14px; border-radius: var(--radius-md); display: flex; align-items: center; gap: 10px; cursor: pointer;">
+        <input type="radio" name="smart_mode_choice" value="video">
+        <svg class="svg-icon svg-xs" viewBox="0 0 24 24" style="color: #60a5fa;"><rect x="2" y="3" width="20" height="14" rx="2"/><polygon points="10 8 16 11.5 10 15 10 8"/></svg>
+        <span><strong>General Video Mode</strong> (Chapters, Overview, Key Moments)</span>
+      </label>
+    </div>
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <label style="font-size: 0.8rem; color: var(--text-muted); display: flex; align-items: center; gap: 6px;">
+        <input type="checkbox" id="smart-mode-reanalyze-check"> Re-analyze with AI
+      </label>
+      <div style="display: flex; gap: 8px;">
+        <button class="btn btn-secondary" onclick="closeSmartModeModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="submitChangeSmartMode()">Apply Mode</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================================= -->
+<!-- RENAME SPEAKER MODAL                                      -->
+<!-- ========================================================= -->
+<div class="modal-backdrop" id="rename-speaker-modal" style="display: none;" onclick="if (event.target === this) closeRenameSpeakerModal()">
+  <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 24px; max-width: 420px; width: 90%; box-shadow: var(--shadow-lg);">
+    <h3 style="font-size: 1.15rem; font-weight: 700; margin-bottom: 6px;">Rename Speaker</h3>
+    <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 14px;">
+      Rename this speaker across all spoken segments in this session.
+    </p>
+    <input type="hidden" id="rename-speaker-old-name">
+    <div style="margin-bottom: 14px;">
+      <label style="display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 4px; color: var(--text-secondary);">New Speaker Name</label>
+      <input type="text" id="rename-speaker-input" placeholder="e.g. Professor Luis" style="width: 100%; background: var(--bg-app); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 8px 12px; color: var(--text-primary); outline: none;">
+    </div>
+    <div style="display: flex; justify-content: flex-end; gap: 10px;">
+      <button class="btn btn-secondary" onclick="closeRenameSpeakerModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="submitRenameSpeaker()">Save Speaker</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================================= -->
+<!-- NEW WORKSPACE MODAL                                       -->
+<!-- ========================================================= -->
+<div class="modal-backdrop" id="new-workspace-modal" style="display: none;" onclick="if (event.target === this) closeNewWorkspaceModal()">
+  <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 24px; max-width: 440px; width: 90%; box-shadow: var(--shadow-lg);">
+    <h3 style="font-size: 1.15rem; font-weight: 700; margin-bottom: 6px;">Create Workspace</h3>
+    <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 14px;">
+      Group related lectures, meetings, and research into a knowledge hub.
+    </p>
+    <div style="margin-bottom: 12px;">
+      <label style="display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 4px; color: var(--text-secondary);">Workspace Name</label>
+      <input type="text" id="new-workspace-name" placeholder="e.g. Distributed Systems Course" style="width: 100%; background: var(--bg-app); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 8px 12px; color: var(--text-primary); outline: none;">
+    </div>
+    <div style="margin-bottom: 16px;">
+      <label style="display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 4px; color: var(--text-secondary);">Description (Optional)</label>
+      <input type="text" id="new-workspace-desc" placeholder="Semester 3 lecture notes and transcripts" style="width: 100%; background: var(--bg-app); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 8px 12px; color: var(--text-primary); outline: none;">
+    </div>
+    <div style="display: flex; justify-content: flex-end; gap: 10px;">
+      <button class="btn btn-secondary" onclick="closeNewWorkspaceModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="submitCreateWorkspace()">Create Workspace</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================================= -->
+<!-- ASSISTANT ACTION CONFIRMATION MODAL                       -->
+<!-- ========================================================= -->
+<div class="modal-backdrop" id="assistant-confirmation-modal" style="display: none;" onclick="if (event.target === this) handleConfirmDeny()">
+  <div class="confirmation-modal-dialog">
+    <div class="confirmation-header">
+      <div class="confirmation-icon-warning">
+        <svg class="svg-icon svg-md" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      </div>
+      <div>
+        <h3 class="confirmation-title">Action Requires Confirmation</h3>
+        <span class="type-badge" id="confirm-risk-badge" style="background: rgba(245, 158, 11, 0.2); color: #f59e0b; font-size: 0.72rem;">SENSITIVE ACTION</span>
+      </div>
+    </div>
+
+    <p class="confirmation-body" id="confirm-modal-prompt">
+      SmartScribe wants to perform an action that requires explicit confirmation.
+    </p>
+
+    <div>
+      <div style="font-size: 0.78rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px;">Target Parameters</div>
+      <div class="confirmation-args-box" id="confirm-modal-args">
+        {}
+      </div>
+    </div>
+
+    <input type="hidden" id="confirm-active-token">
+
+    <div class="confirmation-actions">
+      <button class="btn btn-secondary" onclick="handleConfirmDeny()">Cancel / Deny</button>
+      <button class="btn btn-primary" id="confirm-approve-btn" onclick="handleConfirmApprove()">Approve &amp; Execute</button>
+    </div>
+  </div>
+</div>
+
+<!-- Floating Toast Container -->
+<div class="toast-container" id="toast-container"></div>
+
+<!-- Client Application Engine -->
+<script src="/static/js/app.js"></script>
+
+</body>
+</html>

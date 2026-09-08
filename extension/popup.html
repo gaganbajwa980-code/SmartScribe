@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SmartScribe Bridge</title>
+  <style>
+    :root {
+      --bg-primary: #0a0d14;
+      --bg-card: #121826;
+      --border: #1e293b;
+      --accent-cyan: #00e5ff;
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+      --success: #10b981;
+      --danger: #ef4444;
+    }
+    body {
+      width: 320px;
+      margin: 0;
+      padding: 16px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-main);
+      box-sizing: border-box;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+    }
+    .badge {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent-cyan);
+      box-shadow: 0 0 8px var(--accent-cyan);
+    }
+    .title {
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      color: var(--accent-cyan);
+    }
+    .page-info {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px;
+      margin-bottom: 12px;
+    }
+    .page-title {
+      font-size: 13px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-bottom: 4px;
+    }
+    .page-url {
+      font-size: 11px;
+      color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .btn {
+      width: 100%;
+      padding: 10px;
+      background: linear-gradient(135deg, #00b4d8, #0077b6);
+      border: 1px solid var(--accent-cyan);
+      border-radius: 6px;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: opacity 0.2s;
+    }
+    .btn:hover {
+      opacity: 0.9;
+    }
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .status {
+      margin-top: 10px;
+      font-size: 12px;
+      text-align: center;
+      min-height: 20px;
+    }
+    .status.success { color: var(--success); }
+    .status.error { color: var(--danger); }
+    .status.info { color: var(--text-muted); }
+    .footer-note {
+      margin-top: 12px;
+      font-size: 10px;
+      color: var(--text-muted);
+      text-align: center;
+      line-height: 1.3;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="badge"></div>
+    <div class="title">SmartScribe Bridge</div>
+  </div>
+
+  <div class="page-info">
+    <div id="pageTitle" class="page-title">Loading tab...</div>
+    <div id="pageUrl" class="page-url">-</div>
+  </div>
+
+  <button id="sendBtn" class="btn">
+    <span>⚡ Send Page to SmartScribe</span>
+  </button>
+
+  <div id="status" class="status info">Ready to capture rendered page.</div>
+
+  <div class="footer-note">
+    🔒 Read-Only Architecture. Form inputs, cookies, and passwords are never accessed.
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
