@@ -1,6 +1,7 @@
 import re
 import json
 import time
+from pathlib import Path
 from typing import Optional, Dict, Any, List
 
 from backend.assistant.planner.plan_schema import TaskPlan, PlanStep, PlanStatus, StepStatus
@@ -11,6 +12,7 @@ from backend.assistant.tool_registry import ToolRegistry
 from backend.resource_manager import ResourceManager
 from backend.assistant.planner.context_snapshot import ContextSnapshot, ContextDecision, collect_context_snapshot
 from backend.assistant.planner.session_memory import SessionMemory
+from backend.assistant.tools.desktop_tools import NOTES_DIR
 
 class TaskPlanner:
     """
@@ -211,6 +213,35 @@ class TaskPlanner:
                     dependencies=["step_1"],
                     expected_result=f"Folder '{topic} Lecture' opened",
                     verification_requirement="folder_open"
+                )
+            ]
+            return TaskPlan(user_query=q, goal=goal, steps=steps)
+
+        # -------------------------------------------------------------
+        # Pattern E2: "Prepare my {topic} lecture notes." / "Prepare {topic} notes."
+        # -------------------------------------------------------------
+        m_prep_notes = re.search(
+            r"\bprepare\s+(?:my\s+)?(?:today'?s\s+)?(.+?)\s+(?:lecture\s+)?notes?\s*[\.\?]?$",
+            q_lower
+        )
+        if m_prep_notes:
+            raw_topic = m_prep_notes.group(1).strip()
+            topic = re.sub(r"\b(today'?s|the|my)\b", "", raw_topic, flags=re.IGNORECASE).strip()
+            topic = topic.title() or "Operating Systems"
+            goal = f"Prepare lecture notes for {topic}"
+            steps = [
+                PlanStep(
+                    step_id="step_1",
+                    tool="create_note",
+                    arguments={
+                        "title": f"{topic} Notes",
+                        "content": f"# {topic} Lecture Notes\nDate: {time.strftime('%Y-%m-%d')}\nTopic: {topic}\n\n## Key Concepts\n- \n\n## Questions\n- \n",
+                        "extension": "md"
+                    },
+                    reason=f"Prepare lecture notes for {topic}",
+                    risk_level=RiskLevel.LOW_RISK_ACTION,
+                    expected_result=f"Note '{topic} Notes.md' prepared",
+                    verification_requirement="file_persistence"
                 )
             ]
             return TaskPlan(user_query=q, goal=goal, steps=steps)
@@ -797,7 +828,8 @@ SCHEMA:
 
         # Rule 1: Check explicit "new" / "another"
         has_explicit_new_folder = bool(re.search(r"\b(?:create|make)\s+(?:another|a\s+new)\s+folder\b", q_lower))
-        has_explicit_new_note = bool(re.search(r"\b(?:create|make)\s+(?:another|a\s+new)\s+note\b", q_lower))
+        has_explicit_new_note = bool(re.search(r"\b(?:create|make|write)\s+(?:another|a\s+new|new)\s+note\b", q_lower))
+        has_explicit_another_note = bool(re.search(r"\b(?:create|make|write)\s+another\s+note\b", q_lower))
 
         # Check existing workspaces to adapt folder creation
         if not has_explicit_new_folder:
@@ -810,13 +842,12 @@ SCHEMA:
                     f_name = s.arguments.get("folder_name", "")
                     # Match exact or case-insensitive or base stem
                     existing_match = None
+                    norm_fn = f_name.lower().strip()
+                    norm_fn_base = re.sub(r"\s+(?:lecture|class|workspace|project|session)$", "", norm_fn)
                     for ew in snapshot.existing_workspaces:
-                        if (
-                            ew.lower() == f_name.lower() or
-                            ew.lower() == f_name.replace(" Lecture", "").lower() or
-                            f_name.lower().startswith(ew.lower()) or
-                            ew.lower().startswith(f_name.lower())
-                        ):
+                        norm_ew = ew.lower().strip()
+                        norm_ew_base = re.sub(r"\s+(?:lecture|class|workspace|project|session)$", "", norm_ew)
+                        if norm_ew == norm_fn or norm_ew_base == norm_fn_base or norm_ew == norm_fn_base or norm_ew_base == norm_fn:
                             existing_match = ew
                             break
 
@@ -855,13 +886,12 @@ SCHEMA:
                 elif s.tool == "open_folder":
                     # If this open_folder was following an omitted create_folder, update target if needed
                     f_arg = s.arguments.get("folder_name", "")
+                    norm_fa = f_arg.lower().strip()
+                    norm_fa_base = re.sub(r"\s+(?:lecture|class|workspace|project|session)$", "", norm_fa)
                     for ew in snapshot.existing_workspaces:
-                        if (
-                            ew.lower() == f_arg.lower() or
-                            ew.lower() == f_arg.replace(" Lecture", "").lower() or
-                            f_arg.lower().startswith(ew.lower()) or
-                            ew.lower().startswith(f_arg.lower())
-                        ):
+                        norm_ew = ew.lower().strip()
+                        norm_ew_base = re.sub(r"\s+(?:lecture|class|workspace|project|session)$", "", norm_ew)
+                        if norm_ew == norm_fa or norm_ew_base == norm_fa_base or norm_ew == norm_fa_base or norm_ew_base == norm_fa:
                             s.arguments["folder_name"] = ew
                             s.reused = True
                             s.context_observation = f"Reusing existing workspace '{ew}'."
@@ -872,13 +902,33 @@ SCHEMA:
                 elif s.tool == "create_note":
                     s.dependencies = [d for d in s.dependencies if any(st.step_id == d for st in adapted_steps)]
                     n_title = s.arguments.get("title", "")
-                    if not has_explicit_new_note:
-                        note_match = None
+                    if not (has_explicit_new_note or has_explicit_another_note):
+                        # Helper for normalizing note titles consistent with TargetResolver philosophy
+                        def _norm_note(name: str) -> str:
+                            t = (name or "").lower().strip()
+                            t = re.sub(r"\.(?:md|txt|docx)$", "", t)
+                            t = re.sub(r"\s+(?:lecture\s+)?notes?$", "", t).strip()
+                            return t
+
+                        target_norm = _norm_note(n_title)
+                        target_tokens = [w for w in target_norm.split() if len(w) > 1 and w not in ("the", "my", "a", "an", "today", "todays")]
+
+                        exact_matches = []
+                        partial_candidates = []
+
                         for en in snapshot.existing_notes:
-                            if en.lower() == n_title.lower() or en.lower() == n_title.replace(" Notes", "").lower():
-                                note_match = en
-                                break
-                        if note_match:
+                            en_lower = en.lower().strip()
+                            en_norm = _norm_note(en)
+
+                            if en_lower == n_title.lower().strip() or en_norm == target_norm:
+                                exact_matches.append(en)
+                            else:
+                                if target_tokens and all(k in en_norm for k in target_tokens):
+                                    partial_candidates.append(en)
+
+                        # Decision resolution
+                        if len(exact_matches) == 1:
+                            note_match = exact_matches[0]
                             steps_changed = True
                             obs = f"Note '{note_match}' already exists."
                             dec = ContextDecision(
@@ -886,17 +936,79 @@ SCHEMA:
                                 confidence="HIGH",
                                 effect_on_plan="reuse_note",
                                 source="DesktopContext.filesystem",
-                                details={"existing_note": note_match}
+                                details={"existing_note": note_match, "target_title": n_title}
                             )
                             plan.context_decisions.append(dec.to_dict())
                             plan.context_used.append(f"{note_match} note exists")
                             # Convert create_note to open_file
+                            note_file_name = f"{note_match}.md"
+                            try:
+                                if (NOTES_DIR / f"{note_match}.txt").exists():
+                                    note_file_name = f"{note_match}.txt"
+                                elif (NOTES_DIR / f"{note_match}.md").exists():
+                                    note_file_name = f"{note_match}.md"
+                            except Exception:
+                                pass
                             s.tool = "open_file"
-                            s.arguments = {"query": f"{note_match}.md"}
+                            s.arguments = {"query": note_file_name, "file_name": note_file_name}
                             s.reason = f"Note '{note_match}' already exists; opening existing note."
                             s.description = f"Open existing note '{note_match}'"
                             s.reused = True
                             s.context_observation = obs
+                            adapted_steps.append(s)
+                            continue
+
+                        elif len(exact_matches) > 1 or (not exact_matches and len(partial_candidates) > 1):
+                            # Ambiguous match: multiple existing notes match the topic!
+                            ambig_candidates = exact_matches if len(exact_matches) > 1 else partial_candidates
+                            obs = f"Ambiguous note request: Found multiple candidates matching '{n_title}': {', '.join(ambig_candidates)}."
+                            dec = ContextDecision(
+                                observation=obs,
+                                confidence="MEDIUM",
+                                effect_on_plan="request_clarification",
+                                source="DesktopContext.filesystem",
+                                details={"candidates": ambig_candidates, "target_title": n_title}
+                            )
+                            plan.context_decisions.append(dec.to_dict())
+                            plan.context_used.append(f"Ambiguous note candidates: {', '.join(ambig_candidates)}")
+                            plan.status = PlanStatus.FAILED
+                            plan.steps = []
+                            plan.goal = "Clarification required for ambiguous note request"
+                            plan.error_message = f"Ambiguous note request: Multiple candidate notes found ({', '.join(ambig_candidates)}). Please clarify which note you want to open or create."
+                            plan.is_adapted = True
+                            plan.adaptation_reason = "Halted plan: Ambiguous note candidates found in context."
+                            return plan
+
+                        elif len(exact_matches) == 0 and len(partial_candidates) == 1:
+                            note_match = partial_candidates[0]
+                            steps_changed = True
+                            obs = f"Found matching existing note '{note_match}' for topic '{n_title}'."
+                            dec = ContextDecision(
+                                observation=obs,
+                                confidence="HIGH",
+                                effect_on_plan="reuse_note",
+                                source="DesktopContext.filesystem",
+                                details={"existing_note": note_match, "target_title": n_title}
+                            )
+                            plan.context_decisions.append(dec.to_dict())
+                            plan.context_used.append(f"{note_match} note exists")
+                            note_file_name = f"{note_match}.md"
+                            try:
+                                if (NOTES_DIR / f"{note_match}.txt").exists():
+                                    note_file_name = f"{note_match}.txt"
+                                elif (NOTES_DIR / f"{note_match}.md").exists():
+                                    note_file_name = f"{note_match}.md"
+                            except Exception:
+                                pass
+                            s.tool = "open_file"
+                            s.arguments = {"query": note_file_name, "file_name": note_file_name}
+                            s.reason = f"Matching note '{note_match}' found; opening existing note."
+                            s.description = f"Open existing note '{note_match}'"
+                            s.reused = True
+                            s.context_observation = obs
+                            adapted_steps.append(s)
+                            continue
+
                     adapted_steps.append(s)
 
                 else:
@@ -917,46 +1029,87 @@ SCHEMA:
                 plan.original_steps = original_steps_dict
                 plan.adaptation_reason = "Adapted plan based on existing filesystem artifacts."
 
-        # Rule 2: Avoid duplicate media/recording or application launches
+        # Rule 2: Avoid duplicate media/recording or application launches (Target-Aware)
         active_app = (snapshot.active_application or "").lower()
         active_title = (snapshot.active_window_title or "").lower()
         active_media = snapshot.active_media_item
 
-        recording_already_open = (
-            active_media is not None or
-            "recording" in active_title or
-            ("media player" in active_app and ("recording" in active_title or ".wav" in active_title)) or
-            "recording" in active_app
-        )
+        rec_step_idx = -1
+        target_rec_name = None
+        target_rec_stem = None
 
-        if recording_already_open:
-            rec_step_idx = -1
-            for idx, s in enumerate(plan.steps):
-                if s.tool == "open_file":
-                    q_arg = (s.arguments.get("query") or s.arguments.get("file_name") or "").lower()
-                    if "recording" in q_arg or "audio" in q_arg or ".wav" in q_arg:
-                        rec_step_idx = idx
-                        break
+        for idx, s in enumerate(plan.steps):
+            if s.tool == "open_file":
+                q_arg = (s.arguments.get("query") or s.arguments.get("file_name") or "").lower()
+                if "recording" in q_arg or "audio" in q_arg or ".wav" in q_arg or ".mp3" in q_arg or ".m4a" in q_arg:
+                    rec_step_idx = idx
+                    # Determine target recording filename
+                    if s.arguments.get("file_name") and s.arguments.get("file_name") not in ("recordings", "notes", "downloads"):
+                        target_rec_name = Path(s.arguments.get("file_name")).name
+                    elif snapshot.existing_recordings:
+                        target_rec_name = snapshot.existing_recordings[-1]
+                    else:
+                        target_rec_name = s.arguments.get("query", "recording.wav")
+                    target_rec_stem = Path(target_rec_name).stem.lower()
+                    break
 
-            if rec_step_idx >= 0 and len(plan.steps) > 1:
-                if not plan.original_steps:
-                    plan.original_steps = [st.to_dict() for st in plan.steps]
-                removed_step = plan.steps.pop(rec_step_idx)
-                for idx, stp in enumerate(plan.steps, 1):
-                    stp.step_id = f"step_{idx}"
-                    stp.dependencies = []
+        if rec_step_idx >= 0 and target_rec_name:
+            # Deterministic evidence check: Is THAT specific target recording already open?
+            is_target_open = False
+            evidence_desc = ""
+            evidence_source = "DesktopContext.active_window"
 
-                obs = "Latest lecture recording is already open/active in the media player."
-                dec = ContextDecision(
-                    observation=obs,
-                    confidence="HIGH",
-                    effect_on_plan="avoid_duplicate_launch",
-                    source="DesktopContext.active_window"
-                )
-                plan.context_decisions.append(dec.to_dict())
-                plan.context_used.append("Latest lecture recording already active")
-                plan.is_adapted = True
-                plan.adaptation_reason = "Latest lecture recording is already active; skipped duplicate launch."
+            # 1. Active media item match
+            if active_media:
+                media_str = str(active_media).lower()
+                if target_rec_stem in media_str or target_rec_name.lower() in media_str:
+                    is_target_open = True
+                    evidence_source = "DesktopContext.active_media"
+                    evidence_desc = f"Target recording '{target_rec_name}' is currently playing/active in media context."
+
+            # 2. Active media player application window containing target filename/stem
+            is_media_app = any(m in active_app for m in ("media player", "groove", "vlc", "wmplayer"))
+            if not is_target_open and is_media_app:
+                if target_rec_stem in active_title or target_rec_name.lower() in active_title:
+                    is_target_open = True
+                    evidence_source = "DesktopContext.active_window"
+                    evidence_desc = f"Target recording '{target_rec_name}' is already open in {snapshot.active_application} ('{snapshot.active_window_title}')."
+
+            # A window titled "Recording Settings" or generic "recording" in a non-media app does NOT count!
+            if is_target_open:
+                if len(plan.steps) > 1:
+                    if not plan.original_steps:
+                        plan.original_steps = [st.to_dict() for st in plan.steps]
+                    removed_step = plan.steps.pop(rec_step_idx)
+                    for idx, stp in enumerate(plan.steps, 1):
+                        stp.step_id = f"step_{idx}"
+                        stp.dependencies = []
+
+                    dec = ContextDecision(
+                        observation=evidence_desc,
+                        confidence="HIGH",
+                        effect_on_plan="avoid_duplicate_launch",
+                        source=evidence_source,
+                        details={"target_recording": target_rec_name, "active_window": snapshot.active_window_title, "active_app": snapshot.active_application}
+                    )
+                    plan.context_decisions.append(dec.to_dict())
+                    plan.context_used.append(f"Recording already active: {target_rec_name}")
+                    plan.is_adapted = True
+                    plan.adaptation_reason = f"Target recording '{target_rec_name}' is already active in media player; skipped duplicate launch."
+                else:
+                    plan.steps[0].reused = True
+                    plan.steps[0].context_observation = evidence_desc
+                    dec = ContextDecision(
+                        observation=evidence_desc,
+                        confidence="HIGH",
+                        effect_on_plan="avoid_duplicate_launch",
+                        source=evidence_source,
+                        details={"target_recording": target_rec_name, "active_window": snapshot.active_window_title, "active_app": snapshot.active_application}
+                    )
+                    plan.context_decisions.append(dec.to_dict())
+                    plan.context_used.append(f"Recording already active: {target_rec_name}")
+                    plan.is_adapted = True
+                    plan.adaptation_reason = f"Target recording '{target_rec_name}' is already active; skipped duplicate launch."
 
         # Attach snapshot dict to plan
         plan.context_snapshot = snapshot.to_dict()

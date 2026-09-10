@@ -110,6 +110,8 @@ class IntentRouter:
         # A. Explicit compound delimiter with action (colon or semicolon syntax)
         if re.search(r"\bprepare\s+(?:my\s+)?.*workspace\s*:\s*.+", q_lower):
             is_multistep = True
+        elif re.search(r"\bprepare\s+(?:my\s+)?(?:today'?s\s+)?(.+?)\s+(?:lecture\s+)?notes?\b", q_lower):
+            is_multistep = True
         elif re.search(r"[:;]\s*(?:create|open|launch|make|start|navigate|browse)\b", q_lower):
             is_multistep = True
         # B. Explicit sequencing connectors
@@ -287,6 +289,7 @@ class IntentRouter:
         # E0. Multi-Step Task Planning & Compound Execution
         is_plan_query = (
             bool(re.search(r"\bprepare\s+(?:everything\s+i\s+need\s+for|a\s+workspace\s+for|materials\s+for|everything\s+for)\s+(?:today'?s\s+)?(.+?)(?:\s+lecture|\s+class|\s+session)?\b", q_lower)) or
+            bool(re.search(r"\bprepare\s+(?:my\s+)?(?:today'?s\s+)?(.+?)\s+(?:lecture\s+)?notes?\b", q_lower)) or
             bool(re.search(r"\bcreate\s+(?:a\s+)?(?:new\s+)?workspace\s+(?:called|named)\s+['\"]?([^'\"]+?)['\"]?\s+and\s+(?:open|view|explore)\s+it\b", q_lower)) or
             bool(re.search(r"\bcreate\s+(?:a\s+)?folder\s+(?:called|named)\s+['\"]?([^'\"]+?)['\"]?,\s+create\s+(?:a\s+)?(?:notes\s+folder|subfolder)\s+inside\s+it,\s+and\s+open\s+it\b", q_lower)) or
             bool(re.search(r"\bcreate\s+(?:a\s+)?note\s+(?:called|named)\s+['\"]?([^'\"]+?)['\"]?\s+and\s+(?:open|show)\s+(?:the\s+)?notes\s+folder\b", q_lower)) or

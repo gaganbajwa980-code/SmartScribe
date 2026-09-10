@@ -144,13 +144,15 @@ class DesktopContext:
         }
 
     def format_untrusted_xml(self) -> str:
-        """
+        r"""
         Formats desktop context into XML tags labeled as untrusted metadata
         so Qwen never confuses window titles with system instructions.
+        Guarantees zero leakage of C:\Users\<username>\ or sensitive profile paths.
         """
-        clean_title = sanitize_desktop_string(self.active_window_title)
-        media_title = sanitize_desktop_string(self.active_media_item.get("title", "None")) if self.active_media_item else "None"
-        browser_title = sanitize_desktop_string(self.active_browser_page.get("title", "None")) if self.active_browser_page else "None"
+        from backend.assistant.planner.context_snapshot import redact_sensitive_paths
+        clean_title = redact_sensitive_paths(sanitize_desktop_string(self.active_window_title))
+        media_title = redact_sensitive_paths(sanitize_desktop_string(self.active_media_item.get("title", "None"))) if self.active_media_item else "None"
+        browser_title = redact_sensitive_paths(sanitize_desktop_string(self.active_browser_page.get("title", "None"))) if self.active_browser_page else "None"
         
         return (
             "<untrusted_desktop_metadata>\n"

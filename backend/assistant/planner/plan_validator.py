@@ -29,9 +29,12 @@ class PlanValidator:
         errors = []
 
         if not plan.steps:
-            errors.append("Plan contains zero steps.")
+            if not plan.error_message:
+                errors.append("Plan contains zero steps.")
+                plan.error_message = "; ".join(errors)
+            else:
+                errors.append(plan.error_message)
             plan.status = PlanStatus.FAILED
-            plan.error_message = "; ".join(errors)
             return False, errors
 
         step_ids_seen = set()
