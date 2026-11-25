@@ -39,6 +39,40 @@ from backend.assistant.interaction.keyboard_driver import (
     ALLOWED_HOTKEYS,
     PROHIBITED_HOTKEYS,
 )
+from backend.assistant.interaction.browser_target_binding import (
+    BrowserTargetBinding,
+    normalize_origin,
+    normalize_url_path,
+)
+from backend.assistant.interaction.browser_bridge import (
+    BrowserBridge,
+    get_browser_bridge,
+    BrowserBridgeRequest,
+    BrowserBridgeResponse,
+    BridgeTokenManager,
+    BridgeStatus,
+    HEADER_SMARTSCRIBE_TOKEN,
+    MAX_PAYLOAD_BYTES,
+    MIN_TIMEOUT_MS,
+    MAX_TIMEOUT_MS,
+    DEFAULT_TIMEOUT_MS,
+)
+from backend.assistant.interaction.dom_discovery import (
+    DOMDiscoveryEngine,
+    compute_dom_fingerprint,
+    classify_element_sensitivity,
+    TargetGeometry,
+    MAX_DISCOVERED_TARGETS,
+    INTERACTIVE_TAGS,
+    INTERACTIVE_ROLES,
+    SENSITIVE_INPUT_TYPES,
+    SENSITIVE_KEYWORDS,
+)
+from backend.assistant.interaction.browser_driver import (
+    BrowserDriver,
+    MAX_BROWSER_TEXT_LEN,
+)
+
 
 __all__ = [
     # 5C.1 Foundations
@@ -74,5 +108,33 @@ __all__ = [
     "MAX_TEXT_PAYLOAD_LENGTH",
     "ALLOWED_HOTKEYS",
     "PROHIBITED_HOTKEYS",
+    # 5C.3.1 Browser Interaction Foundations
+    "BrowserTargetBinding",
+    "normalize_origin",
+    "normalize_url_path",
+    "BrowserBridge",
+    "get_browser_bridge",
+    "BrowserBridgeRequest",
+    "BrowserBridgeResponse",
+    "BridgeTokenManager",
+    "BridgeStatus",
+    "HEADER_SMARTSCRIBE_TOKEN",
+    "MAX_PAYLOAD_BYTES",
+    "MIN_TIMEOUT_MS",
+    "MAX_TIMEOUT_MS",
+    "DEFAULT_TIMEOUT_MS",
+    # 5C.3.2 Safe DOM Discovery & Classification
+    "DOMDiscoveryEngine",
+    "compute_dom_fingerprint",
+    "classify_element_sensitivity",
+    "TargetGeometry",
+    "MAX_DISCOVERED_TARGETS",
+    "INTERACTIVE_TAGS",
+    "INTERACTIVE_ROLES",
+    "SENSITIVE_INPUT_TYPES",
+    "SENSITIVE_KEYWORDS",
+    # 5C.3.3 Controlled Browser Action Driver
+    "BrowserDriver",
+    "MAX_BROWSER_TEXT_LEN",
 ]
 

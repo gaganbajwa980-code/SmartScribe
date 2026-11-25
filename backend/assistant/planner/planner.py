@@ -4,7 +4,7 @@ import time
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 
-from backend.assistant.planner.plan_schema import TaskPlan, PlanStep, PlanStatus, StepStatus
+from backend.assistant.planner.plan_schema import TaskPlan, PlanStep, PlanStatus, StepStatus, UserGoal
 from backend.assistant.planner.plan_context import PlanContext
 from backend.assistant.planner.plan_validator import PlanValidator
 from backend.assistant.permission_manager import RiskLevel
@@ -13,6 +13,7 @@ from backend.resource_manager import ResourceManager
 from backend.assistant.planner.context_snapshot import ContextSnapshot, ContextDecision, collect_context_snapshot
 from backend.assistant.planner.session_memory import SessionMemory
 from backend.assistant.tools.desktop_tools import NOTES_DIR
+from backend.assistant.intent_router import KNOWN_WEBSITE_ALIASES, APP_MAP, APP_NAMES_PATTERN
 
 class TaskPlanner:
     """
@@ -36,13 +37,52 @@ class TaskPlanner:
         q = (query or "").strip()
         ctx = context or PlanContext(user_query=q)
 
-        # Ensure session memory and context snapshot are populated
+        # Ensure session memory is populated
         if ctx.session_memory is None:
             ctx.session_memory = self.session_memory
-        if ctx.context_snapshot is None:
-            ctx.context_snapshot = collect_context_snapshot(session_memory=ctx.session_memory)
 
-        # 0. Check for continuation pronouns ("inside it", "notes for it", "open it")
+        # 0. Check for explicit ambiguous / underspecified requests (Ask Rather Than Guess)
+        q_norm = re.sub(r"^(?:could|can)\s+you\s+(?:please\s+)?", "", q.lower().strip())
+        q_norm = re.sub(r"\s+please$", "", q_norm).strip()
+        q_norm = re.sub(r"[?!.,;]+$", "", q_norm).strip()
+
+        if re.match(r"^click\s+(?:that|it|this)$", q_norm):
+            return TaskPlan(
+                user_query=q,
+                goal="Clarification required for ambiguous click",
+                steps=[],
+                status=PlanStatus.FAILED,
+                error_message="Which element should I click? Multiple elements or no active target found. Please specify the button or link name."
+            )
+
+        if re.match(r"^(?:open|go\s+to|visit)\s+(?:that|the)\s+site$", q_norm):
+            return TaskPlan(
+                user_query=q,
+                goal="Clarification required for ambiguous website",
+                steps=[],
+                status=PlanStatus.FAILED,
+                error_message="Which website should I open? Please specify the website name or URL."
+            )
+
+        if re.match(r"^search\s+(?:for\s+)?(?:it|that)$", q_norm):
+            return TaskPlan(
+                user_query=q,
+                goal="Clarification required for ambiguous search query",
+                steps=[],
+                status=PlanStatus.FAILED,
+                error_message="What should I search for? Please specify the search topic."
+            )
+
+        if re.match(r"^(?:do\s+something(?:\s+with\s+this\s+page)?|help\s+me\s+with\s+this\s+page)$", q_norm):
+            return TaskPlan(
+                user_query=q,
+                goal="Clarification required for vague page action",
+                steps=[],
+                status=PlanStatus.FAILED,
+                error_message="What would you like me to do with this page? I can summarize it, extract key points, or answer questions."
+            )
+
+        # Check for continuation pronouns ("inside it", "notes for it", "open it")
         # Only check session memory if the query does NOT define its own antecedent
         has_internal_antecedent = bool(
             re.search(r"\b(?:create|make)\b.*?\b(?:workspace|folder|note)\b", q, re.IGNORECASE)
@@ -58,7 +98,7 @@ class TaskPlanner:
                         goal="Clarification required for ambiguous referent",
                         steps=[],
                         status=PlanStatus.FAILED,
-                        error_message=f"Ambiguous request: {pronoun_res.get('reason', 'Could not resolve referent')}. Please clarify the target name."
+                        error_message=f"Ambiguous request: {pronoun_res.get('reason', 'Could not resolve referent').rstrip('.')}. Please clarify the target name."
                     )
                     ambiguous_plan.context_decisions.append(ContextDecision(
                         observation=f"Pronoun '{pronoun_res.get('pronoun')}' detected without clear referent in session memory.",
@@ -137,7 +177,7 @@ class TaskPlanner:
         5. Quoted spans are restored in each extracted clause.
         """
         masked, quote_map = cls.mask_quoted_spans(q)
-        ACTION_VERBS = r"(?:open|launch|start|explore|view|browse|navigate|create|make)"
+        ACTION_VERBS = r"(?:open|launch|start|explore|view|browse|navigate|create|make|search|look\s+up|find|type|write|enter|input|click|select|play|summarize|explain|record|tell\s+me)"
         split_pattern = (
             r"\s+(?:and\s+)?then\s+|"
             r"\s+(?:followed\s+by|after\s+that)\s+|"
@@ -161,9 +201,578 @@ class TaskPlanner:
 
     def _plan_deterministic(self, q: str, ctx: PlanContext) -> Optional[TaskPlan]:
         """
-        Deterministic planning rules for common student, lecture, and workflow tasks.
+        Deterministic planning rules for common student, lecture, browser, and workflow tasks.
         """
-        q_lower = q.lower()
+        q_lower = q.lower().strip()
+        q_norm = re.sub(r"^(?:could|can)\s+you\s+(?:please\s+)?", "", q_lower)
+        q_norm = re.sub(r"\s+please$", "", q_norm).strip()
+        q_norm = re.sub(r"[?!.,;]+$", "", q_norm).strip()
+        q_lower = q_norm
+
+        # -------------------------------------------------------------
+        # 0. AMBIGUITY & CONFIDENCE POLICIES (ASK RATHER THAN GUESS)
+        # -------------------------------------------------------------
+        if re.match(r"^(?:open|launch|play|show|view|explore)\s+(?:it|that|this)$", q_lower):
+            pronoun_res = ctx.session_memory.resolve_pronoun_reference(q) if ctx.session_memory else None
+            if not pronoun_res or not pronoun_res.get("resolved"):
+                return TaskPlan(
+                    user_query=q,
+                    goal="Clarification required for ambiguous referent",
+                    steps=[],
+                    status=PlanStatus.FAILED,
+                    error_message="Ambiguous request: Referent 'it' cannot be resolved: no prior target found in session memory. Please clarify the target name."
+                )
+            else:
+                target_data = pronoun_res.get("target", {})
+                t_type = target_data.get("type", "file")
+                t_name = pronoun_res.get("resolved_value") or target_data.get("name")
+                if t_type == "folder":
+                    return TaskPlan(
+                        user_query=q,
+                        goal=f"Open folder '{t_name}'",
+                        steps=[
+                            PlanStep(
+                                step_id="step_1",
+                                tool="open_folder",
+                                arguments={"folder_name": t_name},
+                                reason=f"Open referenced folder '{t_name}'",
+                                risk_level=RiskLevel.READ_ONLY
+                            )
+                        ],
+                        status=PlanStatus.DRAFT
+                    )
+                else:
+                    return TaskPlan(
+                        user_query=q,
+                        goal=f"Open file '{t_name}'",
+                        steps=[
+                            PlanStep(
+                                step_id="step_1",
+                                tool="open_file",
+                                arguments={"target": t_name, "requested_target": t_name},
+                                reason=f"Open referenced file '{t_name}'",
+                                risk_level=RiskLevel.LOW_RISK_ACTION
+                            )
+                        ],
+                        status=PlanStatus.DRAFT
+                    )
+
+        if re.match(r"^click\s+(?:that|it|this)$", q_lower):
+            return TaskPlan(
+                user_query=q,
+                goal="Clarification required for ambiguous click",
+                steps=[],
+                status=PlanStatus.FAILED,
+                error_message="Which element should I click? Multiple elements or no active target found. Please specify the button or link name."
+            )
+
+        if re.match(r"^(?:open|go\s+to|visit)\s+(?:that|the)\s+site$", q_lower):
+            return TaskPlan(
+                user_query=q,
+                goal="Clarification required for ambiguous website",
+                steps=[],
+                status=PlanStatus.FAILED,
+                error_message="Which website should I open? Please specify the website name or URL."
+            )
+
+        if re.match(r"^search\s+(?:for\s+)?(?:it|that)$", q_lower):
+            return TaskPlan(
+                user_query=q,
+                goal="Clarification required for ambiguous search query",
+                steps=[],
+                status=PlanStatus.FAILED,
+                error_message="What should I search for? Please specify the search topic."
+            )
+
+        if re.match(r"^(?:do\s+something(?:\s+with\s+this\s+page)?|help\s+me\s+with\s+this\s+page)$", q_lower):
+            return TaskPlan(
+                user_query=q,
+                goal="Clarification required for vague page action",
+                steps=[],
+                status=PlanStatus.FAILED,
+                error_message="What would you like me to do with this page? I can summarize it, extract key points, or answer questions."
+            )
+
+        # -------------------------------------------------------------------
+        # 0.5. BROWSER VIDEO CONTROLS
+        # -------------------------------------------------------------------
+        # Next video
+        if re.search(
+            r"\b(?:play\s+(?:the\s+)?next(?:\s+video)?|next\s+video|go\s+to\s+(?:the\s+)?next\s+video|skip\s+(?:this\s+)?video)\b",
+            q_lower
+        ):
+            return TaskPlan(
+                user_query=q,
+                goal="Play the next video",
+                steps=[
+                    PlanStep(
+                        step_id="step_1",
+                        tool="click_browser_element",
+                        arguments={
+                            "target_binding": {
+                                "tab_id": -1,
+                                "window_id": -1,
+                                "origin": "",
+                                "url_path": "/",
+                                "frame_id": 0,
+                                "dom_selector": ".ytp-next-button, button[aria-label*='Next']",
+                                "element_fingerprint": "",
+                                "element_tag": "BUTTON",
+                                "element_role": "button",
+                                "is_visible": True,
+                                "is_enabled": True,
+                                "is_sensitive": False
+                            }
+                        },
+                        reason="Click Next Video button in browser",
+                        risk_level=RiskLevel.LOW_RISK_ACTION,
+                        dependencies=[],
+                        expected_result="Next video started playing"
+                    )
+                ]
+            )
+
+        # Pause / resume video
+        if re.search(
+            r"\b(?:pause(?:\s+(?:the\s+)?video)?|stop\s+(?:the\s+)?video|unpause(?:\s+video)?|resume(?:\s+the\s+)?video|play\s+(?:the\s+)?video|toggle\s+(?:video\s+)?playback)\b",
+            q_lower
+        ):
+            return TaskPlan(
+                user_query=q,
+                goal="Toggle video playback (pause or resume)",
+                steps=[
+                    PlanStep(
+                        step_id="step_1",
+                        tool="click_browser_element",
+                        arguments={
+                            "target_binding": {
+                                "tab_id": -1,
+                                "window_id": -1,
+                                "origin": "",
+                                "url_path": "/",
+                                "frame_id": 0,
+                                "dom_selector": ".ytp-play-button, button[aria-label*='Pause'], button[aria-label*='Play']",
+                                "element_fingerprint": "",
+                                "element_tag": "BUTTON",
+                                "element_role": "button",
+                                "is_visible": True,
+                                "is_enabled": True,
+                                "is_sensitive": False
+                            }
+                        },
+                        reason="Click Pause/Play button in browser",
+                        risk_level=RiskLevel.LOW_RISK_ACTION,
+                        dependencies=[],
+                        expected_result="Video playback toggled"
+                    )
+                ]
+            )
+
+        # -------------------------------------------------------------
+        # 1. BROWSER COMPOUND WORKFLOW DECOMPOSITION
+        # -------------------------------------------------------------
+        # Case A: "Open {site} and search for {topic}" / "Go to {site} and look up {topic}"
+        m_site_search = re.search(
+            r"^(?:(?:could|can)\s+you\s+(?:please\s+)?)?(?:open|launch|go\s+to|visit|browse(?:\s+to)?)\s+(?:the\s+)?([a-zA-Z0-9_.-]+)[,\s]+(?:and\s+)?(?:then\s+)?(?:search(?:\s+for)?|look\s+up|find)\s+(.+)$",
+            q_lower
+        )
+        if not m_site_search:
+            m_site_search = re.search(
+                r"^(?:(?:could|can)\s+you\s+(?:please\s+)?)?(?:on\s+([a-zA-Z0-9_.-]+)\s+search(?:\s+for)?\s+(.+)|search(?:\s+for)?\s+(.+?)\s+on\s+([a-zA-Z0-9_.-]+))(?:\s+and\s+.+)?$",
+                q_lower
+            )
+        if not m_site_search:
+            m_site_search = re.search(
+                r"^(?:(?:could|can)\s+you\s+(?:please\s+)?)?open\s+(chrome|browser|edge)\s*,\s*search\s+(?:for\s+)?(.+?)(?:,\s*and\s+(?:tell\s+me\s+what\s+you\s+find|report\s+status|verify))?$",
+                q_lower
+            )
+
+        if m_site_search:
+            if m_site_search.lastindex and m_site_search.lastindex >= 4 and m_site_search.group(3) and m_site_search.group(4):
+                topic = m_site_search.group(3).strip().rstrip(".,?!")
+                site_raw = m_site_search.group(4).strip()
+            else:
+                site_raw = m_site_search.group(1).strip()
+                topic = m_site_search.group(2).strip().rstrip(".,?!")
+
+            # Check if topic contains a 3rd clause (e.g. ", and explain the result", "and explain what you find", "and summarize it")
+            third_tool = None
+            m_followup = re.search(r"(?:,\s*and\s+|\s+and\s+)(?:then\s+)?(explain|summarize|tell\s+me)(?:\s+(?:the\s+result|results?|what\s+you\s+find|it|them|about\s+it))?$", topic, re.IGNORECASE)
+            if m_followup:
+                verb = m_followup.group(1).lower()
+                topic = topic[:m_followup.start()].strip().rstrip(".,?!")
+                if "summarize" in verb:
+                    third_tool = "summarize_current_page"
+                else:
+                    third_tool = "explain_current_page"
+
+            site_clean = site_raw.lower()
+            if site_clean in KNOWN_WEBSITE_ALIASES:
+                target_url = KNOWN_WEBSITE_ALIASES[site_clean]
+                origin = target_url
+                display_site = site_clean.title()
+            elif "." in site_clean:
+                target_url = site_clean if site_clean.startswith("http") else f"https://{site_clean}"
+                origin = target_url
+                display_site = site_clean
+            elif site_clean in ("chrome", "browser", "edge", "brave"):
+                target_url = "https://www.google.com"
+                origin = "https://www.google.com"
+                display_site = "Google"
+            else:
+                return TaskPlan(
+                    user_query=q,
+                    goal="Clarification required for unknown website",
+                    steps=[],
+                    status=PlanStatus.FAILED,
+                    error_message=f"Which website should I open? '{site_raw}' is not recognized. Please specify a full domain."
+                )
+
+            goal = f"Open {display_site} and search for '{topic}'"
+            steps = [
+                PlanStep(
+                    step_id="step_1",
+                    tool="open_website",
+                    arguments={"url": target_url},
+                    reason=f"Open {display_site} in default browser",
+                    risk_level=RiskLevel.LOW_RISK_ACTION,
+                    expected_result=f"{display_site} opened in browser",
+                    verification_requirement="url_opened"
+                ),
+                PlanStep(
+                    step_id="step_2",
+                    tool="read_current_page",
+                    arguments={},
+                    reason=f"Observe active browser page and discover DOM targets on {display_site}",
+                    risk_level=RiskLevel.LOW_RISK_ACTION,
+                    dependencies=["step_1"],
+                    expected_result="Active page observed and DOM targets discovered",
+                    verification_requirement="page_observed"
+                ),
+                PlanStep(
+                    step_id="step_3",
+                    tool="type_browser_field",
+                    arguments={
+                        "target_binding": {
+                            "tab_id": 1,
+                            "window_id": 1,
+                            "origin": origin,
+                            "url_path": "/",
+                            "frame_id": 0,
+                            "dom_selector": "#search, input[name='search_query'], input[type='search'], #search-input, input[name='search'], input[name='q']",
+                            "element_fingerprint": f"sha256:{site_clean}_search_input",
+                            "element_tag": "INPUT",
+                            "element_role": "searchbox",
+                            "is_visible": True,
+                            "is_enabled": True,
+                            "is_sensitive": False
+                        },
+                        "text": topic
+                    },
+                    reason=f"Type search topic '{topic}' into search box",
+                    risk_level=RiskLevel.LOW_RISK_ACTION,
+                    dependencies=["step_2"],
+                    expected_result=f"Topic '{topic}' entered and verified",
+                    verification_requirement="read_back_verified"
+                ),
+                PlanStep(
+                    step_id="step_4",
+                    tool="click_browser_element",
+                    arguments={
+                        "target_binding": {
+                            "tab_id": 1,
+                            "window_id": 1,
+                            "origin": origin,
+                            "url_path": "/",
+                            "frame_id": 0,
+                            "dom_selector": "#search-icon-legacy, button[type='submit'], #search-btn, button[aria-label='Search'], input[type='submit']",
+                            "element_fingerprint": f"sha256:{site_clean}_search_button",
+                            "element_tag": "BUTTON",
+                            "element_role": "button",
+                            "is_visible": True,
+                            "is_enabled": True,
+                            "is_sensitive": False
+                        }
+                    },
+                    reason="Click search button to execute search",
+                    risk_level=RiskLevel.LOW_RISK_ACTION,
+                    dependencies=["step_3"],
+                    expected_result="Search button clicked and search executed",
+                    verification_requirement="action_verified"
+                ),
+                PlanStep(
+                    step_id="step_5",
+                    tool="read_current_page",
+                    arguments={},
+                    reason=f"Verify resulting search results for '{topic}'",
+                    risk_level=RiskLevel.LOW_RISK_ACTION,
+                    dependencies=["step_4"],
+                    expected_result=f"Search results for '{topic}' verified",
+                    verification_requirement="results_verified"
+                )
+            ]
+
+            if third_tool:
+                verb_display = "explain" if third_tool == "explain_current_page" else "summarize"
+                goal = f"Open {display_site}, search for '{topic}', and {verb_display} results"
+                steps.append(
+                    PlanStep(
+                        step_id="step_6",
+                        tool=third_tool,
+                        arguments={},
+                        reason=f"{verb_display.title()} resulting search page for '{topic}'",
+                        risk_level=RiskLevel.LOW_RISK_ACTION,
+                        dependencies=["step_5"],
+                        expected_result=f"Explanation/summary for '{topic}' generated",
+                        verification_requirement="action_verified"
+                    )
+                )
+
+            return TaskPlan(user_query=q, goal=goal, steps=steps)
+
+        # Case B: "Type {topic} into search box and click search" / "Search for {topic} and tell me the resulting status"
+        m_type_click = re.search(
+            r"\btype\s+(?:['\"]([^'\"]+)['\"]|(.+?))\s+into\s+(?:the\s+)?(?:search(?:\s+box|\s+field|\s+input)?|input|field|textbox)\s+and\s+(?:then\s+)?click\s+(?:the\s+)?(?:search(?:\s+button|\s+icon)?|button)\b",
+            q_lower
+        )
+        if not m_type_click:
+            m_type_click = re.search(
+                r"\bsearch\s+for\s+(?:['\"]([^'\"]+)['\"]|(.+?))\s+and\s+tell\s+me\s+(?:the\s+resulting\s+status|what\s+happened|results?)\b",
+                q_lower
+            )
+        if m_type_click:
+            topic = (m_type_click.group(1) or m_type_click.group(2)).strip().rstrip(".,?!")
+            goal = f"Enter '{topic}' into search box and execute search"
+            steps = [
+                PlanStep(
+                    step_id="step_1",
+                    tool="read_current_page",
+                    arguments={},
+                    reason="Observe active browser page and discover DOM targets",
+                    risk_level=RiskLevel.LOW_RISK_ACTION,
+                    expected_result="Active page observed and DOM targets discovered",
+                    verification_requirement="page_observed"
+                ),
+                PlanStep(
+                    step_id="step_2",
+                    tool="type_browser_field",
+                    arguments={
+                        "target_binding": {
+                            "tab_id": 1,
+                            "window_id": 1,
+                            "origin": "https://active.browser.local",
+                            "url_path": "/",
+                            "frame_id": 0,
+                            "dom_selector": "#search, input[name='search_query'], input[type='search'], #search-input",
+                            "element_fingerprint": "sha256:active_page_search_input",
+                            "element_tag": "INPUT",
+                            "element_role": "searchbox",
+                            "is_visible": True,
+                            "is_enabled": True,
+                            "is_sensitive": False
+                        },
+                        "text": topic
+                    },
+                    reason=f"Type '{topic}' into search input",
+                    risk_level=RiskLevel.LOW_RISK_ACTION,
+                    dependencies=["step_1"],
+                    expected_result=f"Topic '{topic}' entered and verified",
+                    verification_requirement="read_back_verified"
+                ),
+                PlanStep(
+                    step_id="step_3",
+                    tool="click_browser_element",
+                    arguments={
+                        "target_binding": {
+                            "tab_id": 1,
+                            "window_id": 1,
+                            "origin": "https://active.browser.local",
+                            "url_path": "/",
+                            "frame_id": 0,
+                            "dom_selector": "#search-icon-legacy, button[type='submit'], #search-btn, button[aria-label='Search']",
+                            "element_fingerprint": "sha256:active_page_search_button",
+                            "element_tag": "BUTTON",
+                            "element_role": "button",
+                            "is_visible": True,
+                            "is_enabled": True,
+                            "is_sensitive": False
+                        }
+                    },
+                    reason="Click search button to submit query",
+                    risk_level=RiskLevel.LOW_RISK_ACTION,
+                    dependencies=["step_2"],
+                    expected_result="Search button clicked",
+                    verification_requirement="action_verified"
+                ),
+                PlanStep(
+                    step_id="step_4",
+                    tool="read_current_page",
+                    arguments={},
+                    reason=f"Verify resulting status for '{topic}'",
+                    risk_level=RiskLevel.LOW_RISK_ACTION,
+                    dependencies=["step_3"],
+                    expected_result=f"Search outcome verified",
+                    verification_requirement="results_verified"
+                )
+            ]
+            return TaskPlan(user_query=q, goal=goal, steps=steps)
+
+        # Case C: "Type {topic} into the search box"
+        m_single_type = re.search(
+            r"\btype\s+(?:['\"]([^'\"]+)['\"]|(.+?))\s+into\s+(?:the\s+)?(?:search(?:\s+box|\s+field|\s+input)?|input|field|textbox)$",
+            q_lower
+        )
+        if m_single_type:
+            text_to_type = (m_single_type.group(1) or m_single_type.group(2)).strip().rstrip(".,?!")
+            goal = f"Type '{text_to_type}' into search input"
+            steps = [
+                PlanStep(
+                    step_id="step_1",
+                    tool="read_current_page",
+                    arguments={},
+                    reason="Observe active browser page and discover DOM targets",
+                    risk_level=RiskLevel.LOW_RISK_ACTION,
+                    expected_result="Active page observed",
+                    verification_requirement="page_observed"
+                ),
+                PlanStep(
+                    step_id="step_2",
+                    tool="type_browser_field",
+                    arguments={
+                        "target_binding": {
+                            "tab_id": 1,
+                            "window_id": 1,
+                            "origin": "https://active.browser.local",
+                            "url_path": "/",
+                            "frame_id": 0,
+                            "dom_selector": "#search, input[name='search_query'], input[type='search'], #search-input",
+                            "element_fingerprint": "sha256:active_search_input",
+                            "element_tag": "INPUT",
+                            "element_role": "searchbox",
+                            "is_visible": True,
+                            "is_enabled": True,
+                            "is_sensitive": False
+                        },
+                        "text": text_to_type
+                    },
+                    reason=f"Type '{text_to_type}' into search field",
+                    risk_level=RiskLevel.LOW_RISK_ACTION,
+                    dependencies=["step_1"],
+                    expected_result=f"Text '{text_to_type}' typed and verified",
+                    verification_requirement="read_back_verified"
+                )
+            ]
+            return TaskPlan(user_query=q, goal=goal, steps=steps)
+
+        # Case D: "Click the search button" / "Click the first safe result"
+        m_single_click = re.search(
+            r"\bclick\s+(?:the\s+)?(?:(search(?:\s+button|\s+icon)?)|(first(?:\s+safe)?\s+result|result(?:\s+link)?)|button|link)\b",
+            q_lower
+        )
+        if m_single_click:
+            is_search_btn = bool(m_single_click.group(1) or "search" in q_lower)
+            is_first_result = bool(m_single_click.group(2) or "result" in q_lower)
+            if is_search_btn:
+                sel = "#search-icon-legacy, button[type='submit'], #search-btn, button[aria-label='Search']"
+                tag = "BUTTON"
+                role = "button"
+                desc = "search button"
+            elif is_first_result:
+                sel = "a.safe-result, #result-link-1, .result-item a, #results a"
+                tag = "A"
+                role = "link"
+                desc = "first safe result link"
+            else:
+                sel = "button, a"
+                tag = "BUTTON"
+                role = "button"
+                desc = "element"
+
+            goal = f"Click {desc}"
+            steps = [
+                PlanStep(
+                    step_id="step_1",
+                    tool="read_current_page",
+                    arguments={},
+                    reason="Observe active browser page and discover DOM targets",
+                    risk_level=RiskLevel.LOW_RISK_ACTION,
+                    expected_result="Active page observed",
+                    verification_requirement="page_observed"
+                ),
+                PlanStep(
+                    step_id="step_2",
+                    tool="click_browser_element",
+                    arguments={
+                        "target_binding": {
+                            "tab_id": 1,
+                            "window_id": 1,
+                            "origin": "https://active.browser.local",
+                            "url_path": "/",
+                            "frame_id": 0,
+                            "dom_selector": sel,
+                            "element_fingerprint": f"sha256:active_{tag.lower()}_binding",
+                            "element_tag": tag,
+                            "element_role": role,
+                            "is_visible": True,
+                            "is_enabled": True,
+                            "is_sensitive": False
+                        }
+                    },
+                    reason=f"Click {desc}",
+                    risk_level=RiskLevel.LOW_RISK_ACTION,
+                    dependencies=["step_1"],
+                    expected_result=f"{desc.title()} clicked and verified",
+                    verification_requirement="action_verified"
+                )
+            ]
+            return TaskPlan(user_query=q, goal=goal, steps=steps)
+
+        # Case E: "Select option A in the dropdown"
+        m_single_select = re.search(
+            r"\bselect\s+(?:option\s+)?(?:['\"]([^'\"]+)['\"]|(.+?))\s+(?:in|from)\s+(?:the\s+)?(?:dropdown|select)\b|\bselect\s+option\s+([a-zA-Z0-9_\s-]+)$",
+            q_lower
+        )
+        if m_single_select:
+            opt_val = (m_single_select.group(1) or m_single_select.group(2) or m_single_select.group(3)).strip().rstrip(".,?!")
+            goal = f"Select '{opt_val}' in dropdown"
+            steps = [
+                PlanStep(
+                    step_id="step_1",
+                    tool="read_current_page",
+                    arguments={},
+                    reason="Observe active browser page and discover DOM targets",
+                    risk_level=RiskLevel.LOW_RISK_ACTION,
+                    expected_result="Active page observed",
+                    verification_requirement="page_observed"
+                ),
+                PlanStep(
+                    step_id="step_2",
+                    tool="select_browser_option",
+                    arguments={
+                        "target_binding": {
+                            "tab_id": 1,
+                            "window_id": 1,
+                            "origin": "https://active.browser.local",
+                            "url_path": "/",
+                            "frame_id": 0,
+                            "dom_selector": "select#topic-select, select",
+                            "element_fingerprint": "sha256:active_select_binding",
+                            "element_tag": "SELECT",
+                            "element_role": "combobox",
+                            "is_visible": True,
+                            "is_enabled": True,
+                            "is_sensitive": False
+                        },
+                        "option_value": opt_val
+                    },
+                    reason=f"Select option '{opt_val}' in dropdown",
+                    risk_level=RiskLevel.LOW_RISK_ACTION,
+                    dependencies=["step_1"],
+                    expected_result=f"Option '{opt_val}' selected and verified",
+                    verification_requirement="read_back_verified"
+                )
+            ]
+            return TaskPlan(user_query=q, goal=goal, steps=steps)
 
         # -------------------------------------------------------------
         # Pattern E: "Prepare a workspace for today's {topic} lecture." /
@@ -460,6 +1069,18 @@ class TaskPlanner:
         # Pattern G: General Multi-Action Sequence Decomposition (Hardened)
         # Uses decompose_clauses() to respect content 'and' vs action 'and'
         # -------------------------------------------------------------
+        # Pre-compile app clause pattern using shared APP_NAMES_PATTERN
+        _APP_CLAUSE_RE = re.compile(
+            r"\b(?:open|launch|start|go\s+to|switch\s+to|take\s+me\s+to)\s+(?:the\s+)?(?:application\s+|app\s+)?("
+            + APP_NAMES_PATTERN + r")\b",
+            re.IGNORECASE
+        )
+        # 4c. Browser action signals - prevent misclassification as open_file
+        _BROWSER_SIGNAL_RE = re.compile(
+            r"\b(first\s+(?:result|video|link)|top\s+result|click\s+(?:the\s+)?(?:first|top)|play\s+(?:the\s+)?(?:first|top)\s+(?:result|video|link)|next\s+video|pause\s+(?:the\s+)?video|search\s+result)\b",
+            re.IGNORECASE
+        )
+
         clauses = self.decompose_clauses(q)
         extracted_steps = []
         last_created_folder = None
@@ -468,6 +1089,59 @@ class TaskPlanner:
         for c in clauses:
             c_clean = c.strip()
             if not c_clean:
+                continue
+
+            # 0a. start recording
+            m_rec_start = re.search(r"\b(?:start|begin)\s+(?:the\s+)?(?:audio\s+|microphone\s+)?recording\b", c_clean, re.IGNORECASE)
+            if m_rec_start:
+                dep = [extracted_steps[-1].step_id] if extracted_steps else []
+                extracted_steps.append(PlanStep(
+                    step_id=f"step_{step_idx}",
+                    tool="start_recording",
+                    arguments={},
+                    reason="Start microphone recording",
+                    risk_level=RiskLevel.LOW_RISK_ACTION,
+                    dependencies=dep,
+                    expected_result="Microphone recording started"
+                ))
+                step_idx += 1
+                continue
+
+            # 0b. stop recording
+            m_rec_stop = re.search(r"\b(?:stop|finish|end)\s+(?:the\s+)?(?:audio\s+|microphone\s+)?recording\b", c_clean, re.IGNORECASE)
+            if m_rec_stop:
+                dep = [extracted_steps[-1].step_id] if extracted_steps else []
+                extracted_steps.append(PlanStep(
+                    step_id=f"step_{step_idx}",
+                    tool="stop_recording",
+                    arguments={},
+                    reason="Stop microphone recording",
+                    risk_level=RiskLevel.LOW_RISK_ACTION,
+                    dependencies=dep,
+                    expected_result="Microphone recording stopped and saved"
+                ))
+                step_idx += 1
+                continue
+
+            # 0c. summarize or explain action
+            m_sum = re.search(r"\b(?:summarize|explain)\s+(?:it|this|that|the\s+result|results?|the\s+page|the\s+lecture|the\s+session|what\s+you\s+find)?\b", c_clean, re.IGNORECASE)
+            if m_sum:
+                dep = [extracted_steps[-1].step_id] if extracted_steps else []
+                prev_tool = extracted_steps[-1].tool if extracted_steps else ""
+                if prev_tool in ("open_website", "read_current_page"):
+                    tool_to_use = "explain_current_page" if "explain" in c_clean.lower() else "summarize_current_page"
+                else:
+                    tool_to_use = "summarize_current_session"
+                extracted_steps.append(PlanStep(
+                    step_id=f"step_{step_idx}",
+                    tool=tool_to_use,
+                    arguments={},
+                    reason="Summarize or explain referenced target",
+                    risk_level=RiskLevel.LOW_RISK_ACTION,
+                    dependencies=dep,
+                    expected_result="Summary or explanation generated"
+                ))
+                step_idx += 1
                 continue
 
             # Check if this clause is an open/launch action vs create action
@@ -558,10 +1232,11 @@ class TaskPlanner:
                 step_idx += 1
                 continue
 
-            # 4. open application
-            m_app = re.search(r"\b(?:open|launch|start)\s+(?:the\s+)?(?:application\s+|app\s+)?(chrome|vscode|calculator|notepad|explorer)\b", c_clean, re.IGNORECASE)
+            # 4. open application - uses shared APP_NAMES_PATTERN for consistency
+            m_app = _APP_CLAUSE_RE.search(c_clean)
             if m_app:
-                app_n = m_app.group(1).lower()
+                raw_app_name = m_app.group(1).lower().strip()
+                app_n = APP_MAP.get(raw_app_name, raw_app_name)
                 extracted_steps.append(PlanStep(
                     step_id=f"step_{step_idx}",
                     tool="open_application",
@@ -573,15 +1248,125 @@ class TaskPlanner:
                 step_idx += 1
                 continue
 
+            # 4d. type/write text into foreground application
+            m_type = re.search(
+                r"\b(?:write|type|enter|input)\s+(?:['\"]([^'\"]+)['\"]|(.+))",
+                c_clean, re.IGNORECASE
+            )
+            if m_type:
+                text_to_type = (m_type.group(1) or m_type.group(2)).strip().rstrip('.,;')
+                # Determine target window from prior open_application step
+                target_win = ""
+                for prev_step in reversed(extracted_steps):
+                    if prev_step.tool == "open_application":
+                        target_win = prev_step.arguments.get("application", "").title()
+                        break
+                dep = [extracted_steps[-1].step_id] if extracted_steps else []
+                extracted_steps.append(PlanStep(
+                    step_id=f"step_{step_idx}",
+                    tool="type_text",
+                    arguments={
+                        "text": text_to_type,
+                        "target_window_title": target_win
+                    },
+                    reason=f"Type '{text_to_type}' into {target_win or 'foreground window'}",
+                    risk_level=RiskLevel.LOW_RISK_ACTION,
+                    dependencies=dep,
+                    expected_result=f"Text '{text_to_type}' typed into {target_win or 'foreground window'}"
+                ))
+                step_idx += 1
+                continue
+
+            # 4b. open website (alias or domain/URL)
+            KNOWN_TLDS = (".com", ".org", ".net", ".edu", ".gov", ".io", ".co", ".ai", ".dev", ".app", ".info", ".me")
+            FILE_EXTS = (".md", ".txt", ".pdf", ".doc", ".docx", ".wav", ".mp3", ".mp4", ".py", ".json", ".csv", ".xlsx", ".pptx", ".log")
+            m_site_clause = re.search(r"\b(?:open|launch|go\s+to|visit|browse(?:\s+to)?)\s+(?:the\s+)?([a-zA-Z0-9_.-]+)(?:\s+website|\s+site)?$", c_clean, re.IGNORECASE)
+            if m_site_clause:
+                site_k = m_site_clause.group(1).lower().strip()
+                if site_k in KNOWN_WEBSITE_ALIASES:
+                    url_t = KNOWN_WEBSITE_ALIASES[site_k]
+                    dep = [extracted_steps[-1].step_id] if extracted_steps else []
+                    extracted_steps.append(PlanStep(
+                        step_id=f"step_{step_idx}",
+                        tool="open_website",
+                        arguments={"url": url_t},
+                        reason=f"Open website {site_k.title()}",
+                        risk_level=RiskLevel.LOW_RISK_ACTION,
+                        dependencies=dep,
+                        expected_result=f"Website '{site_k.title()}' opened",
+                        verification_requirement="url_opened"
+                    ))
+                    step_idx += 1
+                    continue
+                elif (site_k.startswith(("http://", "https://")) or any(site_k.endswith(tld) for tld in KNOWN_TLDS)) and not any(site_k.endswith(ext) for ext in FILE_EXTS):
+                    url_t = site_k if site_k.startswith("http") else f"https://{site_k}"
+                    dep = [extracted_steps[-1].step_id] if extracted_steps else []
+                    extracted_steps.append(PlanStep(
+                        step_id=f"step_{step_idx}",
+                        tool="open_website",
+                        arguments={"url": url_t},
+                        reason=f"Open website {site_k}",
+                        risk_level=RiskLevel.LOW_RISK_ACTION,
+                        dependencies=dep,
+                        expected_result=f"Website '{site_k}' opened",
+                        verification_requirement="url_opened"
+                    ))
+                    step_idx += 1
+                    continue
+            if _BROWSER_SIGNAL_RE.search(c_clean):
+                # Browser action signal detected — use CSS selector for live DOM resolution
+                # This binding does NOT use a hardcoded fingerprint; the BrowserDriver
+                # performs live DOM lookup using dom_selector as the resolution key.
+                dep = [extracted_steps[-1].step_id] if extracted_steps else []
+                # Determine selector from signal type
+                if re.search(r"\b(pause|stop)\s+(?:the\s+)?video\b", c_clean, re.IGNORECASE):
+                    css_sel = ".ytp-play-button, [data-title-no-tooltip='Pause'], button[aria-label*='Pause']"
+                    action_desc = "pause video"
+                elif re.search(r"\b(next\s+video|play\s+(?:the\s+)?next)\b", c_clean, re.IGNORECASE):
+                    css_sel = ".ytp-next-button, [aria-label*='Next']"
+                    action_desc = "next video"
+                else:
+                    # first result / first video
+                    css_sel = "ytd-video-renderer a#video-title, a.ytd-video-renderer, #results ytd-video-renderer a"
+                    action_desc = "first search result"
+                extracted_steps.append(PlanStep(
+                    step_id=f"step_{step_idx}",
+                    tool="click_browser_element",
+                    arguments={
+                        "target_binding": {
+                            "tab_id": -1,            # -1 = active tab
+                            "window_id": -1,
+                            "origin": "",            # resolved at runtime
+                            "url_path": "/",
+                            "frame_id": 0,
+                            "dom_selector": css_sel,
+                            "element_fingerprint": "",   # empty = live DOM resolution required
+                            "element_tag": "A",
+                            "element_role": "link",
+                            "is_visible": True,
+                            "is_enabled": True,
+                            "is_sensitive": False
+                        }
+                    },
+                    reason=f"Browser action: {action_desc} via CSS selector",
+                    risk_level=RiskLevel.LOW_RISK_ACTION,
+                    dependencies=dep,
+                    expected_result=f"Browser {action_desc} action completed"
+                ))
+                step_idx += 1
+                continue
+
             # 5. open file
             m_file = re.search(r"\b(?:open|launch|play|show|view)\s+(?:the\s+)?(?:file\s+|recording\s+|pdf\s+|audio\s+|document\s+)?(?:called\s+|named\s+)?(?:['\"]([^'\"]+)['\"]|(.+))", c_clean, re.IGNORECASE)
             if m_file:
                 fn = (m_file.group(1) or m_file.group(2)).strip().strip("'\"").rstrip(".,;")
+                if fn.lower() in ("it", "that", "this", "something", "site", "website"):
+                    continue
                 dep = [extracted_steps[-1].step_id] if extracted_steps else []
                 extracted_steps.append(PlanStep(
                     step_id=f"step_{step_idx}",
                     tool="open_file",
-                    arguments={"query": fn},
+                    arguments={"query": fn, "file_name": fn, "target": fn, "requested_target": fn},
                     reason=f"Open file {fn}",
                     risk_level=RiskLevel.LOW_RISK_ACTION,
                     dependencies=dep,
@@ -707,6 +1492,9 @@ SCHEMA:
         Synthesizes a continuation TaskPlan by resolving referent pronouns
         against short-term task session memory.
         """
+        if ctx.context_snapshot is None:
+            ctx.context_snapshot = collect_context_snapshot(session_memory=ctx.session_memory)
+
         q_lower = q.lower()
         target_name = pronoun_res.get("resolved_value") or ""
         pronoun = pronoun_res.get("pronoun") or "it"
@@ -786,11 +1574,14 @@ SCHEMA:
         if m_open_it:
             art_type = pronoun_res.get("target", {}).get("type", "folder")
             tool_name = "open_folder" if art_type == "folder" else "open_file"
-            arg_key = "folder_name" if art_type == "folder" else "file_name"
+            if art_type == "folder":
+                step_args = {"folder_name": target_name}
+            else:
+                step_args = {"target": target_name, "file_name": target_name, "requested_target": target_name}
             step = PlanStep(
                 step_id="step_1",
                 tool=tool_name,
-                arguments={arg_key: target_name},
+                arguments=step_args,
                 reason=f"Open {art_type} '{target_name}'",
                 expected_result=f"{art_type.title()} '{target_name}' opened",
                 verification_requirement="folder_open" if art_type == "folder" else "exact_target_match_check"
@@ -820,8 +1611,14 @@ SCHEMA:
         Inspects context snapshot and adapts plan to reuse existing artifacts,
         avoid redundant launches, and provide structured explanations for plan diffs.
         """
+        if not plan or not plan.steps:
+            return plan
+
+        if ctx.context_snapshot is None and any(s.tool in ("create_folder", "create_note", "open_file") for s in plan.steps):
+            ctx.context_snapshot = collect_context_snapshot(session_memory=ctx.session_memory)
+
         snapshot: Optional[ContextSnapshot] = ctx.context_snapshot
-        if not snapshot or not plan or not plan.steps:
+        if not snapshot:
             return plan
 
         q_lower = plan.user_query.lower()
@@ -1114,3 +1911,83 @@ SCHEMA:
         # Attach snapshot dict to plan
         plan.context_snapshot = snapshot.to_dict()
         return plan
+
+    @classmethod
+    def build_user_goal(cls, query: str, plan: Optional[TaskPlan] = None) -> UserGoal:
+        """
+        Synthesizes a structured UserGoal intermediate representation for a user query.
+        Captures intent, action, target, parameters, constraints, dependencies, confidence,
+        and clarification requirements.
+        """
+        q = (query or "").strip()
+        q_lower = q.lower()
+
+        # Check clarification requirement
+        if plan and plan.status == PlanStatus.FAILED and ("clarif" in (plan.error_message or "").lower() or "ambiguous" in (plan.error_message or "").lower()):
+            return UserGoal(
+                intent="clarification_required",
+                action="clarify",
+                target=None,
+                parameters={"query": q},
+                constraints=["confidence_insufficient"],
+                dependencies=[],
+                confidence=0.4,
+                requires_clarification=True,
+                clarification_prompt=plan.error_message
+            )
+
+        # Compound browser search
+        m_bs = re.search(r"\b(?:open|launch|go\s+to|visit)\s+(?:the\s+)?([a-zA-Z0-9_.-]+)\s+(?:and|,|then)\s+(?:then\s+)?(?:search(?:\s+for)?|look\s+up|find)\s+(.+)$", q_lower)
+        if m_bs:
+            return UserGoal(
+                intent="browser_search_workflow",
+                action="search",
+                target=m_bs.group(1).strip(),
+                parameters={"site": m_bs.group(1).strip(), "query": m_bs.group(2).strip()},
+                constraints=["safe_dom_only", "no_cdp", "verified_action"],
+                dependencies=["open_website", "dom_discovery", "type_field", "click_element"],
+                confidence=0.95,
+                requires_clarification=False
+            )
+
+        # Website opening
+        for alias, url in KNOWN_WEBSITE_ALIASES.items():
+            if re.search(rf"\b(?:open|launch|go\s+to|visit)\s+(?:the\s+)?{alias}\b", q_lower):
+                return UserGoal(
+                    intent="open_website",
+                    action="open",
+                    target=alias,
+                    parameters={"url": url},
+                    constraints=["safe_origin_only"],
+                    dependencies=[],
+                    confidence=0.96,
+                    requires_clarification=False
+                )
+
+        # Page understanding
+        if re.search(r"\b(?:what\s+is\s+this\s+page\s+about|summarize\s+this\s+page)\b", q_lower):
+            return UserGoal(
+                intent="summarize_current_page",
+                action="summarize",
+                target="current_page",
+                parameters={},
+                constraints=["read_only"],
+                dependencies=["active_tab_context"],
+                confidence=0.95,
+                requires_clarification=False
+            )
+
+        # Generic default UserGoal
+        action = plan.steps[0].tool if (plan and plan.steps) else "execute"
+        target = plan.steps[0].arguments.get("file_name") or plan.steps[0].arguments.get("application") or plan.steps[0].arguments.get("url") if (plan and plan.steps) else None
+        return UserGoal(
+            intent=plan.goal if plan else "process_request",
+            action=action,
+            target=target,
+            parameters={"query": q},
+            constraints=["policy_gated"],
+            dependencies=[s.step_id for s in plan.steps] if plan else [],
+            confidence=0.90 if plan else 0.5,
+            requires_clarification=False
+        )
+

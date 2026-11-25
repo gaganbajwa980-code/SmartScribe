@@ -2,7 +2,9 @@ from backend.assistant.tool_registry import ToolRegistry, ToolDefinition
 from backend.assistant.permission_manager import RiskLevel
 from backend.assistant.tools.system_tools import (
     tool_get_system_status, tool_get_current_time, tool_get_disk_status,
-    tool_get_process_summary, tool_diagnose_smartscribe, tool_get_storage_status
+    tool_get_process_summary, tool_diagnose_smartscribe, tool_get_storage_status,
+    tool_stop_action, tool_cancel_action, tool_dismiss_action, tool_pause_action,
+    tool_browser_navigate_back, tool_assistant_greeting
 )
 from backend.assistant.tools.media_tools import (
     tool_start_recording, tool_stop_recording, tool_search_transcript, tool_search_local_files,
@@ -23,7 +25,8 @@ from backend.assistant.tools.desktop_tools import (
     tool_find_desktop_files,
     tool_create_note,
     tool_create_folder,
-    tool_open_folder
+    tool_open_folder,
+    tool_type_text
 )
 
 def register_all_safe_tools():
@@ -396,4 +399,155 @@ def register_all_safe_tools():
         result_schema={"type": "object"}
     ))
 
+    # =====================================================================
+    # 5C.3.3 BROWSER INTERACTION TOOLS
+    # =====================================================================
+    from backend.assistant.tools.browser_interaction_tools import (
+        tool_click_browser_element,
+        tool_type_browser_field,
+        tool_select_browser_option
+    )
+
+    # 26. click_browser_element (LOW_RISK_ACTION, confirmation token required if sensitive)
+    reg.register(ToolDefinition(
+        name="click_browser_element",
+        description="Controlled click on a verified, visible, and enabled browser DOM element.",
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "target_binding": {"type": "object"},
+                "confirmation_token": {"type": "string"}
+            },
+            "required": ["target_binding"]
+        },
+        risk_level=RiskLevel.LOW_RISK_ACTION,
+        requires_confirmation=False,
+        execution_fn=tool_click_browser_element,
+        result_schema={"type": "object"}
+    ))
+
+    # 27. type_browser_field (LOW_RISK_ACTION, strictly non-sensitive fields)
+    reg.register(ToolDefinition(
+        name="type_browser_field",
+        description="Controlled text entry into an approved non-sensitive browser text field.",
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "target_binding": {"type": "object"},
+                "text": {"type": "string"},
+                "confirmation_token": {"type": "string"}
+            },
+            "required": ["target_binding", "text"]
+        },
+        risk_level=RiskLevel.LOW_RISK_ACTION,
+        requires_confirmation=False,
+        execution_fn=tool_type_browser_field,
+        result_schema={"type": "object"}
+    ))
+
+    # 28. select_browser_option (LOW_RISK_ACTION)
+    reg.register(ToolDefinition(
+        name="select_browser_option",
+        description="Controlled option selection in a verified browser <select> dropdown element.",
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "target_binding": {"type": "object"},
+                "option_value": {"type": "string"},
+                "confirmation_token": {"type": "string"}
+            },
+            "required": ["target_binding", "option_value"]
+        },
+        risk_level=RiskLevel.LOW_RISK_ACTION,
+        requires_confirmation=False,
+        execution_fn=tool_select_browser_option,
+        result_schema={"type": "object"}
+    ))
+
+    # 29. stop_action (FAST PATH control, zero LLM)
+    reg.register(ToolDefinition(
+        name="stop_action",
+        description="Immediately stops active speech and cancels current execution.",
+        parameters_schema={"type": "object", "properties": {}},
+        risk_level=RiskLevel.READ_ONLY,
+        requires_confirmation=False,
+        execution_fn=tool_stop_action,
+        result_schema={"type": "object"}
+    ))
+
+    # 30. cancel_action (FAST PATH control)
+    reg.register(ToolDefinition(
+        name="cancel_action",
+        description="Cancels pending or active assistant command.",
+        parameters_schema={"type": "object", "properties": {}},
+        risk_level=RiskLevel.READ_ONLY,
+        requires_confirmation=False,
+        execution_fn=tool_cancel_action,
+        result_schema={"type": "object"}
+    ))
+
+    # 31. dismiss_action (FAST PATH control)
+    reg.register(ToolDefinition(
+        name="dismiss_action",
+        description="Dismisses the prompt or current interaction.",
+        parameters_schema={"type": "object", "properties": {}},
+        risk_level=RiskLevel.READ_ONLY,
+        requires_confirmation=False,
+        execution_fn=tool_dismiss_action,
+        result_schema={"type": "object"}
+    ))
+
+    # 32. pause_action (FAST PATH control)
+    reg.register(ToolDefinition(
+        name="pause_action",
+        description="Pauses active speech and playback.",
+        parameters_schema={"type": "object", "properties": {}},
+        risk_level=RiskLevel.READ_ONLY,
+        requires_confirmation=False,
+        execution_fn=tool_pause_action,
+        result_schema={"type": "object"}
+    ))
+
+    # 33. browser_navigate_back (FAST PATH navigation)
+    reg.register(ToolDefinition(
+        name="browser_navigate_back",
+        description="Navigates back to the previous webpage or view.",
+        parameters_schema={"type": "object", "properties": {}},
+        risk_level=RiskLevel.READ_ONLY,
+        requires_confirmation=False,
+        execution_fn=tool_browser_navigate_back,
+        result_schema={"type": "object"}
+    ))
+
+    # 34. assistant_greeting (FAST PATH greeting)
+    reg.register(ToolDefinition(
+        name="assistant_greeting",
+        description="Greets the user when addressed by name.",
+        parameters_schema={"type": "object", "properties": {}},
+        risk_level=RiskLevel.READ_ONLY,
+        requires_confirmation=False,
+        execution_fn=tool_assistant_greeting,
+        result_schema={"type": "object"}
+    ))
+
+    # 35. type_text (LOW_RISK_ACTION, requires target window match)
+    reg.register(ToolDefinition(
+        name="type_text",
+        description="Safely types text into the verified foreground non-sensitive desktop window (not browser). Requires target window identity validation and sensitive-field rejection.",
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "text": {"type": "string"},
+                "target_window_title": {"type": "string"},
+                "permission_context": {"type": "object"}
+            },
+            "required": ["text"]
+        },
+        risk_level=RiskLevel.LOW_RISK_ACTION,
+        requires_confirmation=False,
+        execution_fn=tool_type_text,
+        result_schema={"type": "object"}
+    ))
+
     return reg
+

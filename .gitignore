@@ -1,9 +1,16 @@
-# Python
+
+# ==========================================
+# SMARTSCRIBE - GIT IGNORE
+# ==========================================
+
+# Python cache
 __pycache__/
 *.py[cod]
 *.pyo
 .pytest_cache/
 .mypy_cache/
+.ruff_cache/
+.hypothesis/
 
 # Virtual environments
 .venv/
@@ -11,17 +18,20 @@ venv/
 env/
 ENV/
 
-# Environment / secrets
+# Environment variables and secrets
 .env
 .env.*
 !.env.example
 
 # Local AI models
-models/*.gguf
-models/*.bin
-models/*.safetensors
-models/*.pt
-models/*.pth
+models/*
+!models/.gitkeep
+
+*.gguf
+*.safetensors
+*.pth
+*.pt
+*.bin
 
 # User-generated SmartScribe data
 recordings/*
@@ -29,7 +39,7 @@ notes/*
 data/*
 workspaces/*
 
-# Keep directory structure in Git
+# Preserve empty folders
 !recordings/.gitkeep
 !notes/.gitkeep
 !data/.gitkeep
@@ -40,28 +50,37 @@ workspaces/*
 *.sqlite
 *.sqlite3
 
-# Logs / temporary files
+# Logs and temporary files
 *.log
 *.tmp
 *.temp
 tmp/
 temp/
 
-# OS / editor files
+# Local browser profiles and caches
+data/app_profile/
+cache/
+.cache/
+
+# Test coverage
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+
+# Operating system files
 .DS_Store
 Thumbs.db
+
+# VS Code local settings
 .vscode/*
 !.vscode/extensions.json
 !.vscode/settings.json
 
-# Build / generated files
+# Build and distribution files
 dist/
 build/
 *.egg-info/
 
-# Local test artifacts
+# Local testing artifacts
 scratch/
-
-# All local AI model files
-models/*
-!models/.gitkeep

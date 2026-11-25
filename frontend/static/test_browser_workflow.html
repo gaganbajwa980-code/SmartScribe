@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>SmartScribe Browser Workflow Test Page</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 2rem; }
+    .control-group { margin-bottom: 1.5rem; }
+    label { font-weight: bold; margin-right: 0.5rem; }
+    input[type="text"] { padding: 0.5rem; font-size: 1rem; width: 300px; }
+    button { padding: 0.5rem 1rem; font-size: 1rem; cursor: pointer; }
+    select { padding: 0.5rem; font-size: 1rem; }
+    #status-message { margin-top: 1rem; padding: 0.75rem; background: #e8f0fe; border-left: 4px solid #1a73e8; border-radius: 4px; font-weight: 500; }
+    #results { margin-top: 1.5rem; }
+    ul { list-style: none; padding-left: 0; }
+    li { margin-bottom: 0.5rem; }
+    a.safe-result { color: #1a0dab; text-decoration: none; font-size: 1.1rem; }
+    a.safe-result:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <h1>SmartScribe Browser Workflow Test Page</h1>
+  <p>Harmless local fixture for testing controlled browser interaction workflows.</p>
+
+  <div class="control-group">
+    <label for="search-input">Search Topics:</label>
+    <input type="text" id="search-input" name="search_query" role="searchbox" placeholder="Enter topic to search..." />
+    <button id="search-btn" type="submit" role="button">Search</button>
+  </div>
+
+  <div class="control-group">
+    <label for="topic-select">Select Category:</label>
+    <select id="topic-select" role="combobox">
+      <option value="option_a">Option A</option>
+      <option value="option_b">Option B</option>
+      <option value="option_c">Option C</option>
+    </select>
+  </div>
+
+  <div class="control-group">
+    <button id="disabled-btn" disabled role="button">Disabled Control</button>
+  </div>
+
+  <div id="status-message" role="status">Ready</div>
+
+  <div id="results">
+    <h3>Search Results</h3>
+    <ul id="results-list">
+      <li><a href="#result1" class="safe-result" id="result-link-1">Result 1: Operating Systems Overview</a></li>
+      <li><a href="#result2" class="safe-result" id="result-link-2">Result 2: Memory Management in Modern OS</a></li>
+      <li><a href="#result3" class="safe-result" id="result-link-3">Result 3: CPU Scheduling Algorithms and Latency</a></li>
+    </ul>
+  </div>
+
+  <script>
+    document.getElementById('search-btn').addEventListener('click', function() {
+      const q = document.getElementById('search-input').value;
+      document.getElementById('status-message').textContent = 'Search executed: ' + q;
+    });
+
+    document.getElementById('topic-select').addEventListener('change', function() {
+      document.getElementById('status-message').textContent = 'Category selected: ' + this.value;
+    });
+  </script>
+</body>
+</html>

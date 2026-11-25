@@ -68,7 +68,8 @@ class FileTargetResolver:
 
     STOP_WORDS = {
         "open", "launch", "play", "show", "view", "display", "find", "get", "load",
-        "my", "the", "me", "a", "an", "this", "that", "please", "can", "you",
+        "my", "the", "me", "a", "an", "this", "that", "it", "them", "something",
+        "site", "website", "please", "can", "you",
         "i", "need", "file", "files", "folder", "folders", "document", "documents",
         "called", "named", "titled", "with", "name", "for", "in", "to", "of", "from"
     }
@@ -81,7 +82,7 @@ class FileTargetResolver:
 
     TYPE_PATTERNS = [
         (re.compile(r"\b(pdf|pdfs)\b", re.IGNORECASE), "pdf"),
-        (re.compile(r"\b(smartscribe recording|audio recording|recordings?|audio)\b", re.IGNORECASE), "recording"),
+        (re.compile(r"\b(smartscribe recording|audio recording|recordings?|audio|lectures?)\b", re.IGNORECASE), "recording"),
         (re.compile(r"\b(notes?|markdown)\b", re.IGNORECASE), "note"),
         (re.compile(r"\b(spreadsheets?|excel|csv)\b", re.IGNORECASE), "spreadsheet"),
         (re.compile(r"\b(documents?|docs?)\b", re.IGNORECASE), "document"),

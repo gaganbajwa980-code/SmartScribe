@@ -65,6 +65,10 @@ class PlanValidator:
                 if isinstance(arg_val, str):
                     val_lower = arg_val.lower()
 
+                    # Skip URL arguments from filesystem path checks
+                    if arg_key == "url" or val_lower.startswith(("http://", "https://")):
+                        continue
+
                     # Check traversal
                     if ".." in arg_val:
                         errors.append(f"Step '{step.step_id}' argument '{arg_key}' contains path traversal ('..').")

@@ -303,13 +303,46 @@ class NativeWin32KeyboardProvider(KeyboardInputProvider):
         return None
 
     def get_control_value(self, hwnd: int, control_id: Optional[str] = None) -> Optional[str]:
+        target_hwnd = int(control_id) if (control_id and control_id.isdigit() and int(control_id) > 0) else hwnd
+
+        # 1. Try Win32 WM_GETTEXT on target control HWND
         WM_GETTEXTLENGTH = 0x000E
         WM_GETTEXT = 0x000D
-        length = self.user32.SendMessageW(wintypes.HWND(hwnd), WM_GETTEXTLENGTH, 0, 0)
-        if length > 0:
-            buf = ctypes.create_unicode_buffer(length + 1)
-            self.user32.SendMessageW(wintypes.HWND(hwnd), WM_GETTEXT, length + 1, buf)
-            return buf.value
+        try:
+            length = self.user32.SendMessageW(wintypes.HWND(target_hwnd), WM_GETTEXTLENGTH, 0, 0)
+            if length > 0:
+                buf = ctypes.create_unicode_buffer(length + 1)
+                self.user32.SendMessageW(wintypes.HWND(target_hwnd), WM_GETTEXT, length + 1, buf)
+                if buf.value:
+                    return buf.value
+        except Exception:
+            pass
+
+        # 2. Try UIAutomation TextPattern / ValuePattern
+        try:
+            import comtypes.client
+            try:
+                import comtypes.gen.UIAutomationClient as UIA
+            except Exception:
+                comtypes.client.GetModule("UIAutomationCore.dll")
+                import comtypes.gen.UIAutomationClient as UIA
+
+            uia = comtypes.client.CreateObject(UIA.CUIAutomation, interface=UIA.IUIAutomation)
+            elem = uia.ElementFromHandle(target_hwnd)
+            if elem:
+                tp = elem.GetCurrentPattern(UIA.UIA_TextPatternId)
+                if tp:
+                    txt = tp.QueryInterface(UIA.IUIAutomationTextPattern).DocumentRange.GetText(-1)
+                    if txt:
+                        return txt
+                vp = elem.GetCurrentPattern(UIA.UIA_ValuePatternId)
+                if vp:
+                    val = vp.QueryInterface(UIA.IUIAutomationValuePattern).CurrentValue
+                    if val:
+                        return val
+        except Exception:
+            pass
+
         return None
 
 class MockKeyboardInputProvider(KeyboardInputProvider):
@@ -340,7 +373,13 @@ class MockKeyboardInputProvider(KeyboardInputProvider):
     def get_control_value(self, hwnd: int, control_id: Optional[str] = None) -> Optional[str]:
         if not self.readback_available:
             return None
-        return self.control_values.get(hwnd)
+        if control_id and control_id.isdigit() and int(control_id) in self.control_values:
+            return self.control_values[int(control_id)]
+        if hwnd in self.control_values:
+            return self.control_values[hwnd]
+        if self.emitted_texts:
+            return "".join(self.emitted_texts)
+        return None
 
 # ---------------------------------------------------------------------------
 # KeyboardDriver

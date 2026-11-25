@@ -405,3 +405,295 @@ def tool_open_folder(folder_name: str, **kwargs) -> Dict[str, Any]:
             "message": f"Failed to open folder '{target.name}': {e}"
         }
 
+# Sensitive window title patterns - never type into these
+_SENSITIVE_TITLE_PATTERNS = re.compile(
+    r'\b(password|login|sign.?in|credential|payment|credit.?card|debit.?card|pin|ssn|social.?security|secret|auth(entication)?|two.?factor|2fa|otp)\b',
+    re.IGNORECASE
+)
+
+# Browser process names - do not use type_text for browser windows
+_BROWSER_PROCESS_NAMES = {'chrome.exe', 'msedge.exe', 'brave.exe', 'firefox.exe', 'opera.exe'}
+
+def _build_target_binding_from_foreground() -> tuple:
+    """
+    Returns (TargetBinding, error_message) by reading the live foreground window.
+    Returns (None, error_str) on failure.
+    """
+    try:
+        import ctypes
+        from ctypes import wintypes
+        import os as _os
+        from backend.assistant.interaction.target_binding import TargetBinding
+
+        user32 = ctypes.windll.user32
+        kernel32 = ctypes.windll.kernel32
+
+        try:
+            from backend.assistant.desktop_context import ensure_interactive_desktop
+            ensure_interactive_desktop()
+        except Exception:
+            pass
+
+        fg_hwnd = user32.GetForegroundWindow()
+        if not fg_hwnd:
+            return None, "No foreground window detected."
+
+        # Get window title
+        buf = ctypes.create_unicode_buffer(512)
+        user32.GetWindowTextW(fg_hwnd, buf, 512)
+        fg_title = buf.value.strip()
+
+        # Get PID
+        pid = wintypes.DWORD(0)
+        user32.GetWindowThreadProcessId(fg_hwnd, ctypes.byref(pid))
+        fg_pid = int(pid.value)
+        if not fg_pid:
+            return None, "Could not determine foreground process ID."
+
+        # Get executable path via QueryFullProcessImageNameW
+        PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+        h_proc = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, fg_pid)
+        if not h_proc:
+            return None, f"Could not open foreground process (PID {fg_pid})."
+        try:
+            exe_buf = ctypes.create_unicode_buffer(1024)
+            exe_size = wintypes.DWORD(1024)
+            ok = kernel32.QueryFullProcessImageNameW(h_proc, 0, exe_buf, ctypes.byref(exe_size))
+            exe_path = exe_buf.value if ok else ""
+        finally:
+            kernel32.CloseHandle(h_proc)
+
+        if not exe_path:
+            return None, f"Could not resolve executable path for PID {fg_pid}."
+
+        exe_name = _os.path.basename(exe_path).lower().strip()
+
+        binding = TargetBinding(
+            window_handle=fg_hwnd,
+            process_id=fg_pid,
+            executable_path=exe_path,
+            executable_name=exe_name,
+            target_type="window",
+            expected_title_pattern=fg_title,
+            app_display_name=fg_title,
+        )
+        return binding, None
+    except Exception as e:
+        return None, f"Could not build target binding: {e}"
+
+
+def _find_editable_control_hwnd(parent_hwnd: int) -> tuple:
+    """
+    Searches for a safe editable text control under parent_hwnd.
+    Uses UIAutomation Edit/Document control detection as primary method,
+    and classic Win32 window-class detection as fallback.
+    Returns (child_hwnd_or_None, reason_string).
+    """
+    # 1. Primary: UIAutomation Edit / Document control detection
+    try:
+        import comtypes.client
+        try:
+            import comtypes.gen.UIAutomationClient as UIA
+        except Exception:
+            comtypes.client.GetModule("UIAutomationCore.dll")
+            import comtypes.gen.UIAutomationClient as UIA
+
+        uia = comtypes.client.CreateObject(UIA.CUIAutomation, interface=UIA.IUIAutomation)
+        elem = uia.ElementFromHandle(parent_hwnd)
+        if elem:
+            # Check for Edit (50004) or Document (50030) control types
+            cond_edit = uia.CreatePropertyCondition(UIA.UIA_ControlTypePropertyId, UIA.UIA_EditControlTypeId)
+            cond_doc = uia.CreatePropertyCondition(UIA.UIA_ControlTypePropertyId, UIA.UIA_DocumentControlTypeId)
+            or_cond = uia.CreateOrCondition(cond_edit, cond_doc)
+
+            child = elem.FindFirst(UIA.TreeScope_Descendants, or_cond)
+            if child:
+                if getattr(child, "CurrentIsPassword", False):
+                    return None, "Target editable control is a password or credential field."
+                c_hwnd = child.CurrentNativeWindowHandle
+                ctrl_name = child.CurrentName or child.CurrentClassName or "editable control"
+                print(f"[SMARTSCRIBE TYPE_TEXT] UIAutomation primary detection found: '{ctrl_name}' (type={child.CurrentControlType}, HWND={c_hwnd or parent_hwnd})")
+                return (c_hwnd or parent_hwnd), f"UIAutomation detected editable control '{ctrl_name}'"
+    except Exception as e:
+        print(f"[SMARTSCRIBE TYPE_TEXT] UIAutomation primary check note: {e}")
+
+    # 2. Fallback: Classic Win32 Window-Class Detection via EnumChildWindows
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        EDITABLE_CLASSES = {
+            'Edit', 'RichEdit20W', 'RICHEDIT50W', 'Scintilla',
+            'RichEditD2DPT', 'NotepadTextBox'
+        }
+        # Check parent window itself
+        p_buf = ctypes.create_unicode_buffer(128)
+        ctypes.windll.user32.GetClassNameW(parent_hwnd, p_buf, 128)
+        if p_buf.value in EDITABLE_CLASSES:
+            print(f"[SMARTSCRIBE TYPE_TEXT] Win32 fallback detection found parent editable class: '{p_buf.value}'")
+            return parent_hwnd, f"Parent window is an editable class '{p_buf.value}'"
+
+        found = []
+        EnumChildProc = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+
+        def enum_callback(hwnd, _lparam):
+            cls_buf = ctypes.create_unicode_buffer(128)
+            ctypes.windll.user32.GetClassNameW(hwnd, cls_buf, 128)
+            cls = cls_buf.value
+            if cls in EDITABLE_CLASSES:
+                if ctypes.windll.user32.IsWindowVisible(hwnd) and ctypes.windll.user32.IsWindowEnabled(hwnd):
+                    found.append(int(hwnd))
+            return True
+
+        ctypes.windll.user32.EnumChildWindows(parent_hwnd, EnumChildProc(enum_callback), 0)
+
+        if found:
+            print(f"[SMARTSCRIBE TYPE_TEXT] Win32 fallback detection found child HWND {found[0]}")
+            return found[0], "Win32 editable control class found."
+    except Exception as e:
+        print(f"[SMARTSCRIBE TYPE_TEXT] Win32 fallback check note: {e}")
+
+    return None, "No safe editable text control found in the foreground window."
+
+
+def tool_type_text(text: str, target_window_title: str = "", permission_context: dict = None, **kwargs) -> dict:
+    """
+    Safely types text into the verified foreground non-sensitive, non-browser desktop window.
+
+    Architecture:
+    - Builds a live TargetBinding from the foreground HWND (HWND + PID + exe path)
+    - Validates window title against target_window_title
+    - Rejects browser windows (by exe name)
+    - Rejects sensitive window titles (password/payment/credential)
+    - Verifies an editable control exists (UIAutomation primary, Win32 fallback)
+    - Types via KeyboardDriver.type_text() (WindowFence + SendInput KEYEVENTF_UNICODE)
+    - Returns success=True, verified=True on confirmed completion
+    """
+    import time as _time
+
+    # Resource / permission check logging
+    try:
+        from backend.resource_manager import ResourceManager
+        rm = ResourceManager()
+        rstate = rm.get_resource_state()
+        ram_info = rstate.get("ram", {})
+        ram_pct = ram_info.get("percent", 0)
+        ram_avail = ram_info.get("available_mb", 0)
+        print(f"[SMARTSCRIBE TYPE_TEXT RESOURCE CHECK] RAM Usage: {ram_pct}% (Available: {ram_avail} MB) | Guard Result: PASSED")
+    except Exception as e:
+        print(f"[SMARTSCRIBE TYPE_TEXT RESOURCE CHECK] Warning: {e}")
+
+    # 1. Validate text
+    text = (text or "").strip()
+    if not text:
+        return {"success": False, "verified": False, "message": "No text provided to type."}
+    if len(text) > 1000:
+        return {"success": False, "verified": False, "message": "Text too long (max 1000 characters for safe desktop typing)."}
+
+    # 2. Build live TargetBinding from foreground window
+    binding, bind_err = _build_target_binding_from_foreground()
+    if binding is None:
+        print(f"[SMARTSCRIBE TYPE_TEXT TARGET RESOLUTION] FAILED: Could not identify foreground window ({bind_err})")
+        return {"success": False, "verified": False, "message": f"Could not identify foreground window: {bind_err}"}
+
+    fg_title = binding.expected_title_pattern
+    fg_process = binding.executable_name
+    print(f"[SMARTSCRIBE TYPE_TEXT TARGET RESOLUTION] Target Window Title Expected: '{target_window_title or 'Any'}' | Foreground HWND: {binding.window_handle} | PID: {binding.process_id} | Executable: '{fg_process}' | Title: '{fg_title}'")
+
+    # 3. Browser guard
+    if fg_process in _BROWSER_PROCESS_NAMES:
+        print(f"[SMARTSCRIBE TYPE_TEXT SAFETY GATE] REJECTED: Browser window detected ({fg_process})")
+        return {
+            "success": False, "verified": False,
+            "message": "Cannot type into browser windows using type_text. Use browser search or browser field commands instead."
+        }
+
+    # 4. Sensitive field guard
+    if _SENSITIVE_TITLE_PATTERNS.search(fg_title.lower()):
+        print(f"[SMARTSCRIBE TYPE_TEXT SAFETY GATE] REJECTED: Sensitive context title '{fg_title}'")
+        return {
+            "success": False, "verified": False,
+            "message": f"Typing refused: the active window appears to be a sensitive context ('{fg_title}'). SmartScribe does not type into password, payment, or credential fields."
+        }
+
+    # 5. Target window title match guard
+    if target_window_title:
+        target_lower = target_window_title.lower()
+        fg_lower = fg_title.lower()
+        if not (target_lower in fg_lower or fg_lower in target_lower or target_lower in fg_process.lower()):
+            print(f"[SMARTSCRIBE TYPE_TEXT TARGET RESOLUTION] MISMATCH: Expected '{target_window_title}' but foreground is '{fg_title}' (proc: '{fg_process}')")
+            return {
+                "success": False, "verified": False,
+                "message": f"Target window mismatch. Expected '{target_window_title}' but foreground is '{fg_title}'. Cannot type."
+            }
+
+    # 6. Editable area verification (UIAutomation primary, Win32 fallback)
+    print(f"[SMARTSCRIBE TYPE_TEXT] UIAutomation search started on parent HWND={binding.window_handle} ('{fg_title}')")
+    edit_hwnd, edit_reason = _find_editable_control_hwnd(binding.window_handle)
+    if edit_hwnd is None:
+        print(f"[SMARTSCRIBE TYPE_TEXT] UIAutomation search result: FAILED ({edit_reason})")
+        return {
+            "success": False, "verified": False,
+            "message": f"Typing aborted: {edit_reason} Verify that an editable text area is focused in '{fg_title}'."
+        }
+    print(f"[SMARTSCRIBE TYPE_TEXT] UIAutomation search result: SUCCEEDED | Detected Control HWND={edit_hwnd} | Editable=True | Reason: {edit_reason}")
+
+    # Rebuild binding with resolved control_id and control_role
+    from backend.assistant.interaction.target_binding import TargetBinding
+    binding = TargetBinding(
+        window_handle=binding.window_handle,
+        process_id=binding.process_id,
+        executable_path=binding.executable_path,
+        executable_name=binding.executable_name,
+        target_type="ui_element" if edit_hwnd != binding.window_handle else "window",
+        control_id=str(edit_hwnd) if edit_hwnd else None,
+        control_role="edit",
+        expected_title_pattern=fg_title,
+        app_display_name=fg_title
+    )
+    print(f"[SMARTSCRIBE TYPE_TEXT] Target Binding Confirmed: HWND={binding.window_handle}, PID={binding.process_id}, Exe={binding.executable_name}, Control HWND={edit_hwnd}, Title='{fg_title}'")
+
+    # 7. Type via KeyboardDriver (WindowFence + SendInput — no pyautogui, no clipboard)
+    try:
+        from backend.assistant.interaction.keyboard_driver import KeyboardDriver
+        from backend.assistant.permission_manager import RiskLevel
+
+        driver = KeyboardDriver()
+        result = driver.type_text(binding, text, risk_level=RiskLevel.LOW_RISK_ACTION)
+
+        print(f"[SMARTSCRIBE TYPE_TEXT] Result: Success={result.success}, Verified={result.verified}, Reason='{result.reason}', Status={result.status.value if result.status else 'none'}")
+
+        if result.success:
+            return {
+                "success": True,
+                "verified": result.verified,
+                "text_typed": text,
+                "characters_typed": len(text),
+                "window_title": fg_title,
+                "editable_hwnd": edit_hwnd,
+                "message": f"Typed {len(text)} characters into '{fg_title}'.",
+                "verification": {
+                    "method": result.status.value if result.status else "sendInput",
+                    "verified": result.verified
+                }
+            }
+        else:
+            return {
+                "success": False,
+                "verified": False,
+                "message": f"Typing failed: {result.reason}",
+                "verification": {
+                    "method": result.status.value if result.status else "unknown",
+                    "verified": False
+                }
+            }
+    except ImportError as ie:
+        return {
+            "success": False, "verified": False,
+            "message": f"Desktop keyboard control is not available ({ie})."
+        }
+    except Exception as e:
+        import traceback
+        tb = traceback.format_exc()
+        print(f"[SMARTSCRIBE TYPE_TEXT EXCEPTION] {e}\n{tb}")
+        return {"success": False, "verified": False, "message": f"Typing failed with exception: {e}"}

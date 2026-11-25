@@ -987,12 +987,16 @@ def assistant_voice():
             tmp_path = tmp.name
             audio_file.save(tmp_path)
 
+        fsize = os.path.getsize(tmp_path) if os.path.exists(tmp_path) else 0
+        print(f"\n[SMARTSCRIBE VOICE AUDIO] Received upload '{audio_file.filename}' ({fsize} bytes) | Session: {session_id}")
+
         try:
             result = engine.process_voice(
                 audio_data=tmp_path,
                 session_id=int(session_id) if session_id else None,
                 confirmation_token=confirmation_token
             )
+            print(f"[SMARTSCRIBE VOICE AUDIO] Processing complete: status={result.get('status')}, path={result.get('path')}, recognized='{result.get('recognized_text')}'")
         finally:
             try:
                 os.unlink(tmp_path)
@@ -1248,6 +1252,163 @@ def browser_clear_page():
         mgr = BrowserManager()
         mgr.clear_current_page()
         return jsonify({"success": True, "message": "Browser page context cleared."})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+# =====================================================================
+# BROWSER BRIDGE PROTOCOL API (PHASE 5C.3.1)
+# =====================================================================
+
+def _is_loopback_request() -> bool:
+    remote = request.remote_addr or ""
+    return remote in ("127.0.0.1", "::1", "localhost")
+
+
+def _validate_bridge_token() -> bool:
+    token = request.headers.get("X-SmartScribe-Token")
+    if not token:
+        token = request.args.get("token")
+    from backend.assistant.interaction.browser_bridge import BridgeTokenManager
+    return BridgeTokenManager().validate_token(token)
+
+
+@app.route("/api/browser/bridge/status", methods=["GET"])
+def browser_bridge_status():
+    """
+    Returns current bridge health and connection state.
+    """
+    try:
+        from backend.assistant.interaction.browser_bridge import get_browser_bridge, HEADER_SMARTSCRIBE_TOKEN
+        bridge = get_browser_bridge()
+        return jsonify({
+            "success": True,
+            "connected": bridge.is_connected(),
+            "pending_requests": bridge.pending_count(),
+            "queued_requests": bridge.queue_size(),
+            "token_header": HEADER_SMARTSCRIBE_TOKEN,
+            "timestamp": time.time()
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/browser/bridge/token", methods=["GET"])
+def browser_bridge_token():
+    """
+    Retrieves the single-session secret token for local extension handshake.
+    Strictly forbidden to non-loopback callers.
+    """
+    if not _is_loopback_request():
+        return jsonify({"success": False, "error": "Forbidden: Loopback callers only."}), 403
+    try:
+        from backend.assistant.interaction.browser_bridge import BridgeTokenManager, HEADER_SMARTSCRIBE_TOKEN
+        token = BridgeTokenManager().get_token()
+        return jsonify({
+            "success": True,
+            "token": token,
+            "header": HEADER_SMARTSCRIBE_TOKEN
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/browser/bridge/heartbeat", methods=["POST"])
+def browser_bridge_heartbeat():
+    """
+    Extension heartbeat & capability check-in. Requires valid token.
+    """
+    if not _validate_bridge_token():
+        return jsonify({"success": False, "error": "Unauthorized: Invalid or missing X-SmartScribe-Token."}), 401
+    try:
+        data = request.get_json(silent=True) or {}
+        from backend.assistant.interaction.browser_bridge import get_browser_bridge
+        bridge = get_browser_bridge()
+        bridge.register_extension(data)
+        return jsonify({"success": True, "timestamp": time.time()})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/browser/bridge/poll", methods=["GET"])
+def browser_bridge_poll():
+    """
+    Called by extension background worker to poll for pending commands.
+    Requires valid token.
+    """
+    if not _validate_bridge_token():
+        return jsonify({"success": False, "error": "Unauthorized: Invalid or missing X-SmartScribe-Token."}), 401
+    try:
+        timeout_arg = request.args.get("timeout", "0.0")
+        try:
+            timeout_sec = float(timeout_arg)
+        except (ValueError, TypeError):
+            timeout_sec = 0.0
+
+        from backend.assistant.interaction.browser_bridge import get_browser_bridge
+        bridge = get_browser_bridge()
+        req = bridge.poll_request(timeout_sec=timeout_sec)
+        if req is not None:
+            return jsonify({
+                "success": True,
+                "has_request": True,
+                "request": req.to_dict()
+            })
+        return jsonify({
+            "success": True,
+            "has_request": False
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/browser/bridge/response", methods=["POST"])
+def browser_bridge_response():
+    """
+    Receives structured response from extension and correlates it to the waiting caller.
+    Requires valid token.
+    """
+    if not _validate_bridge_token():
+        return jsonify({"success": False, "error": "Unauthorized: Invalid or missing X-SmartScribe-Token."}), 401
+    try:
+        data = request.get_json(silent=True)
+        if not data or not isinstance(data, dict):
+            return jsonify({"success": False, "error": "Payload must be a JSON object."}), 400
+        req_id = data.get("request_id")
+        if not req_id:
+            return jsonify({"success": False, "error": "request_id is required."}), 400
+
+        from backend.assistant.interaction.browser_bridge import get_browser_bridge, BrowserBridgeResponse
+        resp = BrowserBridgeResponse.from_dict(data)
+        bridge = get_browser_bridge()
+        correlated = bridge.receive_response(resp)
+        return jsonify({
+            "success": True,
+            "correlated": correlated,
+            "request_id": req_id
+        }), (200 if correlated else 404)
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/browser/bridge/dispatch", methods=["POST"])
+def browser_bridge_dispatch():
+    """
+    Dispatches a command through the bridge and waits for the correlated response.
+    Requires valid token.
+    """
+    if not _validate_bridge_token():
+        return jsonify({"success": False, "error": "Unauthorized: Invalid or missing X-SmartScribe-Token."}), 401
+    try:
+        data = request.get_json(silent=True)
+        if not data or not isinstance(data, dict):
+            return jsonify({"success": False, "error": "Payload must be a JSON object."}), 400
+
+        from backend.assistant.interaction.browser_bridge import get_browser_bridge, BrowserBridgeRequest
+        req = BrowserBridgeRequest.from_dict(data)
+        bridge = get_browser_bridge()
+        resp = bridge.send_request(req)
+        return jsonify(resp.to_dict())
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 

@@ -1,4 +1,4 @@
-from backend.assistant.planner.plan_schema import TaskPlan, PlanStep, PlanStatus, StepStatus
+from backend.assistant.planner.plan_schema import TaskPlan, PlanStep, PlanStatus, StepStatus, UserGoal
 from backend.assistant.planner.plan_context import PlanContext
 from backend.assistant.planner.plan_validator import PlanValidator
 from backend.assistant.planner.plan_executor import PlanExecutor
@@ -9,6 +9,7 @@ __all__ = [
     "PlanStep",
     "PlanStatus",
     "StepStatus",
+    "UserGoal",
     "PlanContext",
     "PlanValidator",
     "PlanExecutor",

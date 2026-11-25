@@ -2346,8 +2346,15 @@ function formatAssistantDataCard(d) {
   if (plan && plan.steps && Array.isArray(plan.steps)) {
     const statusBadges = {
       succeeded: '<span style="color: var(--status-success, #10b981); font-weight: bold;">✓ Succeeded</span>',
+      verified: '<span style="color: var(--status-success, #10b981); font-weight: bold;">✓ Verified</span>',
       executing: '<span style="color: var(--accent-primary, #6366f1); font-weight: bold;">⚙ Executing</span>',
-      awaiting_approval: '<span style="color: var(--status-warning, #f59e0b); font-weight: bold;">⚠ Awaiting Approval</span>',
+      awaiting_approval: '<span style="color: var(--status-warning, #f59e0b); font-weight: bold;">⌛ Awaiting Approval</span>',
+      unconfirmed: '<span style="color: var(--status-warning, #f59e0b); font-weight: bold;">~ Unconfirmed</span>',
+      verification_unavailable: '<span style="color: var(--status-warning, #f59e0b); font-weight: bold;">~ Unconfirmed</span>',
+      verification_failed: '<span style="color: var(--status-error, #ef4444); font-weight: bold;">✕ Verification Failed</span>',
+      stale_target: '<span style="color: var(--status-warning, #f59e0b); font-weight: bold;">⚠ Stale Target</span>',
+      blocked: '<span style="color: var(--status-error, #ef4444); font-weight: bold;">⛔ Blocked</span>',
+      policy_denied: '<span style="color: var(--status-error, #ef4444); font-weight: bold;">⛔ Blocked</span>',
       failed: '<span style="color: var(--status-error, #ef4444); font-weight: bold;">✕ Failed</span>',
       cancelled: '<span style="color: var(--text-muted); font-weight: bold;">⊘ Cancelled</span>',
       skipped: '<span style="color: var(--text-muted); font-style: italic;">↷ Skipped</span>',
@@ -2529,6 +2536,23 @@ async function submitAssistantCommand(explicitQuery = null) {
       return;
     }
 
+    if (data.status === "unconfirmed" || data.status === "verification_unavailable" || data.status === "unconfirmed_halt") {
+      // Action unconfirmed / verification unavailable
+      if (toolBadge) {
+        toolBadge.className = "tool-state-badge tool-state-waiting";
+        toolBadge.innerHTML = `<svg class="svg-icon svg-xs" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>UNCONFIRMED</span>`;
+      }
+      if (toolLabel) toolLabel.textContent = `Action executed, but verification was unavailable.`;
+      if (textElem) {
+        textElem.style.fontStyle = "normal";
+        textElem.style.color = "var(--text-primary)";
+        let htmlContent = escapeHtml(data.response || data.message || "Action completed, but verification was unavailable.").replace(/\n/g, "<br>");
+        if (data.plan) htmlContent += formatAssistantDataCard({ plan: data.plan });
+        textElem.innerHTML = htmlContent;
+      }
+      return;
+    }
+
     if (!data.success) {
       // Error or blocked
       if (toolBadge) {
@@ -2549,28 +2573,29 @@ async function submitAssistantCommand(explicitQuery = null) {
       if (toolBadge) {
         const isAllOk = data.status === "succeeded" || data.status === "complete";
         toolBadge.className = isAllOk ? "tool-state-badge tool-state-complete" : (data.status === "partial_success" ? "tool-state-badge tool-state-waiting" : "tool-state-badge tool-state-failed");
-        toolBadge.innerHTML = `<svg class="svg-icon svg-xs" viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg><span>${data.status ? data.status.toUpperCase() : 'PLAN'}</span>`;
+        const statusLabel = data.status === "succeeded" ? "Done" : (data.status === "partial_success" ? "Partial" : (data.status ? data.status.replace(/_/g, ' ') : "Plan"));
+        toolBadge.innerHTML = `<svg class="svg-icon svg-xs" viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg><span>${statusLabel}</span>`;
       }
       if (toolLabel) toolLabel.textContent = `Task Plan: ${data.plan ? data.plan.goal : 'Multi-Step Execution'} (${data.duration_ms ? data.duration_ms + 'ms' : 'complete'})`;
     } else if (data.tool_name && (data.tool_name.includes("page") || data.tool_name.includes("browser"))) {
       if (toolBadge) {
         toolBadge.className = "tool-state-badge tool-state-complete";
-        toolBadge.innerHTML = `<svg class="svg-icon svg-xs" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg><span>COMPLETE</span>`;
+        toolBadge.innerHTML = `<svg class="svg-icon svg-xs" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg><span>Done</span>`;
       }
       const pageTitle = (data.data && data.data.title) ? data.data.title : "Webpage Article";
       if (toolLabel) toolLabel.textContent = `Article: ${pageTitle} (${data.duration_ms ? (data.duration_ms/1000).toFixed(1) + 's' : 'complete'})`;
     } else if (data.path === "fast_path" || data.path === "hybrid_path") {
       if (toolBadge) {
         toolBadge.className = "tool-state-badge tool-state-complete";
-        toolBadge.innerHTML = `<svg class="svg-icon svg-xs" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg><span>COMPLETE</span>`;
+        toolBadge.innerHTML = `<svg class="svg-icon svg-xs" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg><span>Done</span>`;
       }
       const toolName = data.tool_name || data.intent || "tool";
-      if (toolLabel) toolLabel.textContent = `Executed: ${toolName} (${data.duration_ms ? data.duration_ms + 'ms' : 'fast path'})`;
+      if (toolLabel) toolLabel.textContent = `Executed: ${toolName.replace(/_/g, ' ')} (${data.duration_ms ? data.duration_ms + 'ms' : 'fast path'})`;
     } else {
       // AI Path
       if (toolBadge) {
         toolBadge.className = "tool-state-badge tool-state-complete";
-        toolBadge.innerHTML = `<svg class="svg-icon svg-xs" viewBox="0 0 24 24"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3z"/></svg><span>AI REASONING</span>`;
+        toolBadge.innerHTML = `<svg class="svg-icon svg-xs" viewBox="0 0 24 24"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3z"/></svg><span>AI Answer</span>`;
       }
       if (toolLabel) toolLabel.textContent = `Qwen2.5-3B Local LLM (${data.duration_ms ? (data.duration_ms/1000).toFixed(1) + 's' : 'complete'})`;
     }
@@ -2614,6 +2639,35 @@ async function submitAssistantCommand(explicitQuery = null) {
 // Confirmation Protocol
 let pendingConfirmationTurnId = null;
 
+function formatActionDetails(args, toolName) {
+  if (!args || Object.keys(args).length === 0) return "No additional parameters required.";
+  const lines = [];
+  if (args.session_id !== undefined) lines.push(`Session ID: ${args.session_id}`);
+  if (args.file_name) lines.push(`Target File: ${args.file_name}`);
+  if (args.folder_name) lines.push(`Target Folder: ${args.folder_name}`);
+  if (args.url) lines.push(`Website URL: ${args.url}`);
+  if (args.application) lines.push(`Application: ${args.application}`);
+  if (args.title) lines.push(`Note Title: "${args.title}"`);
+  if (args.content) lines.push(`Note Content: "${args.content.slice(0, 100)}${args.content.length > 100 ? '...' : ''}"`);
+  if (args.query) lines.push(`Search Query: "${args.query}"`);
+  if (args.plan_id) lines.push(`Plan ID: ${args.plan_id}`);
+  if (args.goal) lines.push(`Goal: ${args.goal}`);
+  if (args.target_binding) {
+    const tb = args.target_binding;
+    if (tb.origin) lines.push(`Target Website: ${tb.origin}`);
+    if (tb.element_tag) lines.push(`Target Element: <${tb.element_tag.toLowerCase()}> (${tb.element_role || 'interactive'})`);
+  }
+  if (args.text) lines.push(`Text to Type: "${args.text}"`);
+  if (args.option_value) lines.push(`Selected Option: "${args.option_value}"`);
+
+  if (lines.length === 0) {
+    return Object.entries(args)
+      .map(([k, v]) => `${k.replace(/_/g, ' ')}: ${typeof v === 'object' ? JSON.stringify(v) : v}`)
+      .join('\n');
+  }
+  return lines.join('\n');
+}
+
 function showConfirmationModal(reqData, turnId = null) {
   pendingConfirmationTurnId = turnId;
   const modal = document.getElementById("assistant-confirmation-modal");
@@ -2624,7 +2678,7 @@ function showConfirmationModal(reqData, turnId = null) {
   if (!modal) return;
 
   if (prompt) prompt.textContent = reqData.confirmation_prompt || reqData.message || "Please confirm this action.";
-  if (argsBox) argsBox.textContent = JSON.stringify(reqData.arguments || {}, null, 2);
+  if (argsBox) argsBox.textContent = formatActionDetails(reqData.arguments || {}, reqData.tool_name);
   if (tokenInput) tokenInput.value = reqData.confirmation_token || "";
 
   modal.style.display = "flex";
@@ -2716,6 +2770,151 @@ let pttKeyDownActive = false;
 let currentVoiceTurnId = null;
 let isUsingBrowserVoiceCapture = true;
 
+// Continuous Voice & VAD Controller State
+let voiceAudioContext = null;
+let voiceAnalyser = null;
+let voiceSource = null;
+let vadPollInterval = null;
+let isSpeakingDetected = false;
+let speechStartTime = 0;
+let lastSoundTime = 0;
+let isSubmittingUtterance = false;
+const VAD_SPEECH_THRESHOLD = 16;       // Frequency volume threshold for speech activity
+const VAD_MIN_SPEECH_MS = 400;         // Minimum speech duration before allowing silence cutoff
+const VAD_SILENCE_TIMEOUT_MS = 1200;   // 1.2s silence after speech finalizes utterance immediately
+const VAD_MAX_UTTERANCE_MS = 15000;    // 15s max safeguard per utterance
+
+function createVoiceDialogueTurn(turnId) {
+  const box = document.getElementById("assistant-dialogue-box");
+  if (box) box.style.display = "flex";
+
+  const history = document.getElementById("assistant-dialogue-history");
+  if (history) {
+    const turnHtml = `
+      <div class="dialogue-turn-user" id="user-turn-${turnId}">
+        <span class="dialogue-voice-tag"><svg class="svg-icon svg-xs" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg> Voice</span>
+        <div id="user-text-${turnId}"><em>Listening...</em></div>
+      </div>
+      <div class="dialogue-turn-assistant" id="turn-assistant-${turnId}">
+        <div class="tool-activity-card" id="tool-card-${turnId}">
+          <span class="tool-state-badge tool-state-listening" id="tool-badge-${turnId}">
+            <svg class="svg-icon svg-xs" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
+            <span>LISTENING</span>
+          </span>
+          <div class="assistant-response-content" id="assistant-text-${turnId}">
+            <div class="assistant-loading-pulse">
+              <span class="pulse-dot"></span><span class="pulse-dot"></span><span class="pulse-dot"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+    history.insertAdjacentHTML("beforeend", turnHtml);
+    history.scrollTop = history.scrollHeight;
+  }
+}
+
+function startVadMonitoring() {
+  if (vadPollInterval) clearInterval(vadPollInterval);
+  if (!voiceAnalyser) return;
+
+  const dataArray = new Uint8Array(voiceAnalyser.frequencyBinCount);
+
+  vadPollInterval = setInterval(() => {
+    if (!isVoiceListening || !voiceAnalyser) {
+      if (vadPollInterval) {
+        clearInterval(vadPollInterval);
+        vadPollInterval = null;
+      }
+      return;
+    }
+
+    voiceAnalyser.getByteFrequencyData(dataArray);
+    let sum = 0;
+    for (let i = 0; i < dataArray.length; i++) {
+      sum += dataArray[i];
+    }
+    const avg = sum / dataArray.length;
+    const now = Date.now();
+
+    if (avg > VAD_SPEECH_THRESHOLD) {
+      if (!isSpeakingDetected) {
+        isSpeakingDetected = true;
+        speechStartTime = now;
+      }
+      lastSoundTime = now;
+    } else if (isSpeakingDetected) {
+      const speechDuration = now - speechStartTime;
+      const silenceDuration = now - lastSoundTime;
+
+      // When spoken utterance finishes with trailing silence, finalize immediately
+      if (speechDuration >= VAD_MIN_SPEECH_MS &&
+          (silenceDuration >= VAD_SILENCE_TIMEOUT_MS || speechDuration >= VAD_MAX_UTTERANCE_MS)) {
+        finalizeContinuousUtterance();
+      }
+    }
+  }, 50);
+}
+
+async function finalizeContinuousUtterance() {
+  if (!isVoiceListening || isSubmittingUtterance || !voiceMediaRecorder) return;
+  if (voiceMediaRecorder.state === "inactive") return;
+
+  isSubmittingUtterance = true;
+  isSpeakingDetected = false;
+  speechStartTime = 0;
+  lastSoundTime = 0;
+
+  const turnId = currentVoiceTurnId;
+  const toolBadge = document.getElementById(`tool-badge-${turnId}`);
+  if (toolBadge) {
+    toolBadge.className = "tool-state-badge transcribing";
+    toolBadge.innerHTML = `<svg class="svg-icon svg-xs" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/></svg><span>TRANSCRIBING</span>`;
+  }
+
+  const stopPromise = new Promise((resolve) => {
+    voiceMediaRecorder.onstop = () => {
+      const mimeType = voiceMediaRecorder.mimeType || "audio/webm";
+      const blob = new Blob(voiceAudioChunks, { type: mimeType });
+      voiceAudioChunks = [];
+      resolve(blob);
+    };
+  });
+
+  try {
+    voiceMediaRecorder.stop();
+  } catch (err) {
+    console.error("Error stopping MediaRecorder for utterance finalization:", err);
+    isSubmittingUtterance = false;
+    return;
+  }
+
+  const audioBlob = await stopPromise;
+
+  // Keep microphone alive for next continuous utterance
+  if (isVoiceListening && voiceStream) {
+    voiceAudioChunks = [];
+    voiceMediaRecorder = new MediaRecorder(voiceStream);
+    voiceMediaRecorder.ondataavailable = (e) => {
+      if (e.data && e.data.size > 0) {
+        voiceAudioChunks.push(e.data);
+      }
+    };
+    voiceMediaRecorder.start(100);
+
+    // Prepare next turn slot in dialogue history
+    currentVoiceTurnId = Date.now();
+    createVoiceDialogueTurn(currentVoiceTurnId);
+  }
+
+  if (audioBlob && audioBlob.size >= 500) {
+    await dispatchVoiceAudio(audioBlob, turnId);
+  } else {
+    handleVoiceError(turnId, "No speech detected or audio was too short.");
+  }
+  isSubmittingUtterance = false;
+}
+
 async function startVoiceInput() {
   if (isVoiceListening) return;
 
@@ -2729,35 +2928,13 @@ async function startVoiceInput() {
   }
 
   isVoiceListening = true;
+  isSubmittingUtterance = false;
+  isSpeakingDetected = false;
+  speechStartTime = 0;
+  lastSoundTime = 0;
   currentVoiceTurnId = Date.now();
 
-  const box = document.getElementById("assistant-dialogue-box");
-  if (box) box.style.display = "flex";
-
-  const history = document.getElementById("assistant-dialogue-history");
-  if (history) {
-    const turnHtml = `
-      <div class="dialogue-turn-user" id="user-turn-${currentVoiceTurnId}">
-        <span class="dialogue-voice-tag"><svg class="svg-icon svg-xs" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg> Voice</span>
-        <div id="user-text-${currentVoiceTurnId}"><em>Listening...</em></div>
-      </div>
-      <div class="dialogue-turn-assistant" id="turn-assistant-${currentVoiceTurnId}">
-        <div class="tool-activity-card" id="tool-card-${currentVoiceTurnId}">
-          <span class="tool-state-badge tool-state-listening" id="tool-badge-${currentVoiceTurnId}">
-            <svg class="svg-icon svg-xs" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
-            <span>LISTENING</span>
-          </span>
-          <div class="assistant-response-content" id="assistant-text-${currentVoiceTurnId}">
-            <div class="assistant-loading-pulse">
-              <span class="pulse-dot"></span><span class="pulse-dot"></span><span class="pulse-dot"></span>
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
-    history.insertAdjacentHTML("beforeend", turnHtml);
-    history.scrollTop = history.scrollHeight;
-  }
+  createVoiceDialogueTurn(currentVoiceTurnId);
 
   try {
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
@@ -2771,6 +2948,18 @@ async function startVoiceInput() {
         }
       };
       voiceMediaRecorder.start(100);
+
+      // Initialize Web Audio VAD for continuous utterance finalization
+      try {
+        voiceAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+        voiceAnalyser = voiceAudioContext.createAnalyser();
+        voiceAnalyser.fftSize = 256;
+        voiceSource = voiceAudioContext.createMediaStreamSource(voiceStream);
+        voiceSource.connect(voiceAnalyser);
+        startVadMonitoring();
+      } catch (vadErr) {
+        console.warn("Could not start Web Audio VAD, manual stop required:", vadErr);
+      }
     } else {
       isUsingBrowserVoiceCapture = false;
       await fetch("/api/assistant/voice/start", { method: "POST" });
@@ -2792,6 +2981,16 @@ async function stopVoiceInput() {
   if (!isVoiceListening) return;
   isVoiceListening = false;
   pttKeyDownActive = false;
+
+  if (vadPollInterval) {
+    clearInterval(vadPollInterval);
+    vadPollInterval = null;
+  }
+  if (voiceAudioContext) {
+    try { voiceAudioContext.close(); } catch (e) {}
+    voiceAudioContext = null;
+  }
+  isSpeakingDetected = false;
 
   const micBtn = document.getElementById("assistant-mic-btn");
   if (micBtn) {
@@ -2946,6 +3145,16 @@ function cancelVoiceInput() {
     micBtn.title = "Push-to-talk (Alt+V or Click)";
   }
 
+  if (vadPollInterval) {
+    clearInterval(vadPollInterval);
+    vadPollInterval = null;
+  }
+  if (voiceAudioContext) {
+    try { voiceAudioContext.close(); } catch (e) {}
+    voiceAudioContext = null;
+  }
+  isSpeakingDetected = false;
+
   if (voiceMediaRecorder && voiceMediaRecorder.state !== "inactive") {
     try { voiceMediaRecorder.stop(); } catch (e) {}
   }
@@ -3058,3 +3267,57 @@ function pollSpeechStatus() {
     }
   }, 250);
 }
+
+// =============================================================
+// BROWSER BRIDGE INDICATOR
+// =============================================================
+
+async function updateBrowserIndicator() {
+  const pill = document.getElementById("assistant-browser-indicator");
+  const dot = document.getElementById("assistant-browser-dot");
+  const text = document.getElementById("assistant-browser-status-text");
+  if (!pill || !text) return;
+
+  try {
+    const res = await fetch("/api/browser/current");
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.success && data.context && data.context.url) {
+        const host = data.context.domain || (data.context.title ? data.context.title.slice(0, 18) : "Active");
+        pill.style.background = "rgba(34, 197, 94, 0.15)";
+        pill.style.borderColor = "rgba(34, 197, 94, 0.35)";
+        pill.style.color = "#22c55e";
+        if (dot) dot.style.background = "#22c55e";
+        text.textContent = `Browser: ${host}`;
+        return;
+      }
+    }
+  } catch (_) {}
+
+  try {
+    const resBridge = await fetch("/api/browser/bridge/status");
+    if (resBridge.ok) {
+      const dataBridge = await resBridge.json();
+      if (dataBridge && dataBridge.status === "connected") {
+        pill.style.background = "rgba(34, 197, 94, 0.15)";
+        pill.style.borderColor = "rgba(34, 197, 94, 0.35)";
+        pill.style.color = "#22c55e";
+        if (dot) dot.style.background = "#22c55e";
+        text.textContent = "Browser: Connected";
+        return;
+      }
+    }
+  } catch (_) {}
+
+  // Disconnected state
+  pill.style.background = "rgba(148, 163, 184, 0.12)";
+  pill.style.borderColor = "rgba(148, 163, 184, 0.25)";
+  pill.style.color = "var(--text-muted)";
+  if (dot) dot.style.background = "#94a3b8";
+  text.textContent = "Browser: Disconnected";
+}
+
+// Start browser status polling
+setInterval(updateBrowserIndicator, 5000);
+updateBrowserIndicator();
+

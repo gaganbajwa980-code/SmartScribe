@@ -87,10 +87,21 @@ class AssistantEngine:
         # Step 1: Intent Routing
         intent = self.router.route(q)
         exec_path = intent.get("execution_path")
+        print(f"[SMARTSCRIBE INTENT ROUTER] Query: '{q}' | Path: {exec_path} | Intent: {intent.get('intent')} | Tool: {intent.get('target_tool')} | Args: {intent.get('arguments')}")
+
+        # Immediate fast-path barge-in silencing for control commands
+        if intent.get("target_tool") in ("stop_action", "cancel_action", "dismiss_action", "pause_action"):
+            try:
+                from backend.assistant.speech import SpeechManager
+                SpeechManager().stop()
+            except Exception:
+                pass
+            if cancel_event is not None:
+                cancel_event.set()
 
         def _finalize(res_dict: Dict[str, Any]) -> Dict[str, Any]:
             spoken_text = None
-            if not (cancel_event and cancel_event.is_set()):
+            if not (cancel_event and cancel_event.is_set()) and intent.get("target_tool") not in ("stop_action", "cancel_action"):
                 try:
                     from backend.assistant.speech import SpeechManager
                     resp_str = res_dict.get("response") or res_dict.get("message") or ""
@@ -111,6 +122,7 @@ class AssistantEngine:
                 except Exception:
                     pass
             res_dict["spoken_text"] = spoken_text
+            print(f"[SMARTSCRIBE FINAL RESPONSE] Status: {res_dict.get('status')} | Success: {res_dict.get('success')} | Message: '{res_dict.get('response') or res_dict.get('message')}' (duration: {res_dict.get('duration_ms')}ms)")
             return res_dict
 
         # -------------------------------------------------------------
@@ -155,6 +167,9 @@ class AssistantEngine:
             )
             # Generate the plan
             plan = self.planner.plan(q, context=plan_ctx)
+            print(f"[SMARTSCRIBE PLANNER] Plan ID: {plan.plan_id} | Goal: '{plan.goal}' | Steps ({len(plan.steps)}):")
+            for s in plan.steps:
+                print(f"  - Step {s.step_id}: tool={s.tool}, args={s.arguments}, reason='{s.reason}'")
 
             # Execute the plan
             exec_res = self.plan_executor.execute_plan(
@@ -448,6 +463,7 @@ Below is the real-time structured telemetry data collected from their system. Pr
             transcribe_t0 = time.perf_counter()
             recognized_text = transcriber.transcribe_command(audio_data, cancel_event=cancel_event)
             transcribe_ms = round((time.perf_counter() - transcribe_t0) * 1000, 2)
+            print(f"[SMARTSCRIBE VOICE TRANSCRIPT] Recognized: '{recognized_text}' ({transcribe_ms}ms)")
         except Exception as e:
             return {
                 "success": False,

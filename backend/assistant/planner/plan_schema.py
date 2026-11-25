@@ -25,6 +25,7 @@ class StepStatus(str, Enum):
     SUCCEEDED = "succeeded"
     FAILED = "failed"
     VERIFICATION_FAILED = "verification_failed"
+    UNCONFIRMED = "unconfirmed"
     SKIPPED = "skipped"
     CANCELLED = "cancelled"
 
@@ -46,6 +47,7 @@ class PlanStep:
     verified: bool = False
     reused: bool = False
     context_observation: Optional[str] = None
+    allow_unconfirmed: bool = False
 
     def __post_init__(self):
         if not self.description and self.reason:
@@ -70,7 +72,8 @@ class PlanStep:
             "duration_ms": round(self.duration_ms, 2),
             "verified": self.verified,
             "reused": self.reused,
-            "context_observation": self.context_observation
+            "context_observation": self.context_observation,
+            "allow_unconfirmed": self.allow_unconfirmed
         }
 
     @classmethod
@@ -103,7 +106,8 @@ class PlanStep:
             duration_ms=data.get("duration_ms", 0.0),
             verified=data.get("verified", False),
             reused=data.get("reused", False),
-            context_observation=data.get("context_observation")
+            context_observation=data.get("context_observation"),
+            allow_unconfirmed=data.get("allow_unconfirmed", False)
         )
 
 @dataclass
@@ -190,3 +194,48 @@ class TaskPlan:
             PlanStatus.CANCELLED,
             PlanStatus.PARTIAL_SUCCESS
         )
+
+
+@dataclass
+class UserGoal:
+    """
+    Structured intermediate representation for natural-language requests.
+    Bridges natural language understanding with deterministic / planned execution.
+    """
+    intent: str
+    action: str
+    target: Optional[str] = None
+    parameters: Dict[str, Any] = field(default_factory=dict)
+    constraints: List[str] = field(default_factory=list)
+    dependencies: List[str] = field(default_factory=list)
+    confidence: float = 1.0
+    requires_clarification: bool = False
+    clarification_prompt: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "intent": self.intent,
+            "action": self.action,
+            "target": self.target,
+            "parameters": dict(self.parameters),
+            "constraints": list(self.constraints),
+            "dependencies": list(self.dependencies),
+            "confidence": round(self.confidence, 3),
+            "requires_clarification": self.requires_clarification,
+            "clarification_prompt": self.clarification_prompt
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "UserGoal":
+        return cls(
+            intent=data.get("intent", ""),
+            action=data.get("action", ""),
+            target=data.get("target"),
+            parameters=data.get("parameters", {}),
+            constraints=data.get("constraints", []),
+            dependencies=data.get("dependencies", []),
+            confidence=data.get("confidence", 1.0),
+            requires_clarification=data.get("requires_clarification", False),
+            clarification_prompt=data.get("clarification_prompt")
+        )
+

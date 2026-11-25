@@ -18,11 +18,24 @@ class ExecutionEngine:
             ram = data.get("ram_percent", "N/A")
             cpu = data.get("cpu_percent", "N/A")
             status = data.get("overall_status", "HEALTHY")
-            gpu = data.get("gpu_name") or "None"
-            vram_u = data.get("vram_used_mb", 0)
-            vram_t = data.get("vram_total_mb", 0)
             free_gb = data.get("storage_free_gb", "N/A")
-            return f"System status ({status}): RAM is at {ram}%, CPU at {cpu}%. GPU: {gpu} ({vram_u}/{vram_t} MB VRAM). Storage: {free_gb} GB free."
+
+            cpu_str = f"{int(round(cpu))}%" if isinstance(cpu, (int, float)) and abs(cpu - round(cpu)) < 0.05 else f"{cpu}%"
+            ram_str = f"{int(round(ram))}%" if isinstance(ram, (int, float)) and abs(ram - round(ram)) < 0.05 else f"{ram}%"
+            storage_str = f"{int(round(free_gb))} GB" if isinstance(free_gb, (int, float)) and abs(free_gb - round(free_gb)) < 0.05 else f"{free_gb} GB"
+
+            if status == "HEALTHY":
+                status_phrase = "Your laptop is currently healthy."
+            elif status == "CAUTION":
+                status_phrase = "Your laptop is currently under moderate load."
+            elif status == "HIGH":
+                status_phrase = "Your laptop is currently under high resource load."
+            elif status == "CRITICAL":
+                status_phrase = "Your laptop is currently under critical resource load."
+            else:
+                status_phrase = f"Your laptop status is currently {status}."
+
+            return f"{status_phrase} CPU usage is {cpu_str}, RAM usage is {ram_str}, and you have {storage_str} of free storage."
 
         if tool_name == "get_current_time":
             t_str = data.get("time_str", "")
@@ -123,6 +136,51 @@ class ExecutionEngine:
         if tool_name == "open_folder":
             name = data.get("folder_name", "folder")
             return f"Opened folder '{name}' in File Explorer."
+
+        if tool_name == "click_browser_element":
+            if data.get("verified"):
+                return "Clicked browser element and verified expected postcondition."
+            elif data.get("postcondition_status") == "verification_unavailable":
+                return "Clicked browser element (verification unavailable)."
+            elif not data.get("success", True):
+                return f"Browser click failed: {data.get('error', 'Execution error')}"
+            return "Clicked browser element."
+
+        if tool_name == "type_browser_field":
+            if data.get("verified"):
+                return "Entered text into browser field and verified value."
+            elif data.get("postcondition_status") == "verification_unavailable":
+                return "Entered text into browser field (verification unavailable)."
+            elif not data.get("success", True):
+                return f"Browser typing failed: {data.get('error', 'Execution error')}"
+            return "Entered text into browser field."
+
+        if tool_name == "select_browser_option":
+            if data.get("verified"):
+                return "Selected browser option and verified selection."
+            elif data.get("postcondition_status") == "verification_unavailable":
+                return "Selected browser option (verification unavailable)."
+            elif not data.get("success", True):
+                return f"Browser select failed: {data.get('error', 'Execution error')}"
+            return "Selected browser option."
+
+        if tool_name == "stop_action":
+            return "Stopped."
+
+        if tool_name == "cancel_action":
+            return "Cancelled."
+
+        if tool_name == "dismiss_action":
+            return "Understood."
+
+        if tool_name == "pause_action":
+            return "Paused."
+
+        if tool_name == "browser_navigate_back":
+            return "Navigated back."
+
+        if tool_name == "assistant_greeting":
+            return "I'm listening. How can I help?"
 
         return data.get("message", "Executed successfully.")
 
@@ -225,13 +283,26 @@ class ExecutionEngine:
             verification = ActionVerifier.verify(tool_name, clean_args, result_data if isinstance(result_data, dict) else {})
             
             exec_success = result_data.get("success", True) if isinstance(result_data, dict) else True
+            post_status = result_data.get("postcondition_status") if isinstance(result_data, dict) else None
+            is_unconfirmed = (
+                exec_success and (
+                    post_status == "verification_unavailable" or
+                    verification.method == "browser_postcondition_unavailable" or
+                    (isinstance(result_data, dict) and result_data.get("status") == "verification_unavailable")
+                )
+            )
             is_verif_failure = (
                 (not verification.verified) and
+                (not is_unconfirmed) and
                 (exec_success or (isinstance(result_data, dict) and "verification" in result_data))
             )
-            
+
             if exec_success and verification.verified:
                 final_status = ActionStatus.SUCCEEDED.value
+                final_success = True
+                summary_msg = self._generate_summary(tool_name, result_data, clean_args)
+            elif is_unconfirmed:
+                final_status = ActionStatus.UNCONFIRMED.value
                 final_success = True
                 summary_msg = self._generate_summary(tool_name, result_data, clean_args)
             elif is_verif_failure:

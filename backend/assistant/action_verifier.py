@@ -15,6 +15,8 @@ class ActionStatus(str, Enum):
     SUCCEEDED = "succeeded"
     FAILED = "failed"
     VERIFICATION_FAILED = "verification_failed"
+    UNCONFIRMED = "unconfirmed"
+    VERIFICATION_UNAVAILABLE = "verification_unavailable"
     CANCELLED = "cancelled"
 
 @dataclass
@@ -83,7 +85,9 @@ class ActionVerifier:
         "paint": ["mspaint.exe", "paint.exe"],
         "terminal": ["windowsterminal.exe", "wt.exe"],
         "taskmanager": ["taskmgr.exe"],
-        "taskmgr": ["taskmgr.exe"]
+        "taskmgr": ["taskmgr.exe"],
+        "settings": ["systemsettings.exe"],
+        "store": ["winstore.app.exe"]
     }
 
     @classmethod
@@ -149,6 +153,29 @@ class ActionVerifier:
                     )
         except Exception as e:
             pass
+
+        # Additional foreground window verification for UWP apps
+        if app_clean in ("settings", "store"):
+            try:
+                import win32gui
+                fg_hwnd = win32gui.GetForegroundWindow()
+                if fg_hwnd:
+                    win_title = win32gui.GetWindowText(fg_hwnd).lower()
+                    if app_clean == "settings" and "settings" in win_title:
+                        return VerificationResult(
+                            verified=True,
+                            method="foreground_window_check",
+                            details=f"Windows Settings confirmed active in foreground window: '{win_title}'"
+                        )
+                    elif app_clean == "store" and ("store" in win_title or "microsoft store" in win_title):
+                        return VerificationResult(
+                            verified=True,
+                            method="foreground_window_check",
+                            details=f"Microsoft Store confirmed active in foreground window: '{win_title}'"
+                        )
+            except ImportError:
+                pass  # win32gui not available, fall through to pid-based check
+
 
         # If launched via Popen recently, give a tiny grace period
         if pid is not None:
@@ -434,6 +461,37 @@ class ActionVerifier:
             if path_str:
                 return cls.verify_create_note(Path(path_str), expected_content=content)
             return VerificationResult(verified=False, method="note_check", details="No path returned for note creation.")
+
+        # Browser interaction tools verification
+        if tool_name in ("click_browser_element", "type_browser_field", "select_browser_option"):
+            post_status = result.get("postcondition_status") if isinstance(result, dict) else None
+            is_v = result.get("verified", False) if isinstance(result, dict) else False
+            err = (result.get("error") if isinstance(result, dict) else None) or ""
+
+            if is_v or post_status == "verified":
+                return VerificationResult(
+                    verified=True,
+                    method="browser_postcondition_check",
+                    details=result.get("payload", {}).get("message") or "Browser action verified through live DOM postcondition."
+                )
+            elif post_status == "verification_failed" or (isinstance(result, dict) and result.get("status") == "verification_failed"):
+                return VerificationResult(
+                    verified=False,
+                    method="browser_postcondition_check",
+                    details=err or "Browser action executed, but expected postcondition was not observed."
+                )
+            elif post_status == "verification_unavailable" or (isinstance(result, dict) and result.get("status") == "verification_unavailable"):
+                return VerificationResult(
+                    verified=False,
+                    method="browser_postcondition_unavailable",
+                    details=err or "Browser action completed, but verification was unavailable (unconfirmed)."
+                )
+            else:
+                return VerificationResult(
+                    verified=False,
+                    method="browser_unverified",
+                    details=err or "Browser action executed without deterministic postcondition verification."
+                )
 
         # Default fallback for read-only or diagnostic tools
         return VerificationResult(

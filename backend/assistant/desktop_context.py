@@ -48,11 +48,66 @@ def sanitize_desktop_string(text: str, max_len: int = 150) -> str:
         s = s[:max_len] + "..."
     return s
 
-def get_active_window_info() -> Dict[str, Any]:
+def ensure_interactive_desktop():
+    """Ensures current thread is attached to the interactive 'default' desktop on Windows.
+    NOTE: This only works on FRESH threads (no prior GDI handles). Use run_on_interactive_desktop()
+    for reliable access from Flask/long-lived threads."""
+    try:
+        user32 = ctypes.windll.user32
+        DESKTOP_ALL = 0x01FF
+        hDesk = user32.OpenDesktopW("default", 0, False, DESKTOP_ALL)
+        if hDesk:
+            result = user32.SetThreadDesktop(hDesk)
+            return bool(result)
+    except Exception:
+        pass
+    return False
+
+
+def run_on_interactive_desktop(fn, timeout: float = 3.0):
     """
-    Retrieves the foreground active window title, process ID, and application name
-    using lightweight native Win32 APIs.
-    Zero keystroke, clipboard, form, or private content collection.
+    Runs fn() on a fresh daemon thread attached to the interactive 'default' desktop.
+
+    Flask worker threads (and the Antigravity host process) run on a non-interactive
+    desktop (e.g. 'exebox-...'). SetThreadDesktop() only succeeds on threads that
+    have NOT yet created any GDI/User handles. This helper spawns a pristine thread,
+    calls SetThreadDesktop('default') before any Win32 operation, then executes fn().
+
+    Returns fn()'s return value, or None if the thread timed out or raised an exception.
+    """
+    import threading
+    result_holder = [None]
+    exc_holder = [None]
+
+    def _worker():
+        try:
+            _user32 = ctypes.windll.user32
+            DESKTOP_ALL = 0x01FF
+            hDesk = _user32.OpenDesktopW("default", 0, False, DESKTOP_ALL)
+            if hDesk:
+                ok = _user32.SetThreadDesktop(hDesk)
+                if not ok:
+                    import ctypes as _ct
+                    print(f"[SMARTSCRIBE DESKTOP] SetThreadDesktop failed: err={_ct.get_last_error()}")
+        except Exception as _e:
+            print(f"[SMARTSCRIBE DESKTOP] Desktop attach error: {_e}")
+        try:
+            result_holder[0] = fn()
+        except Exception as _e2:
+            exc_holder[0] = _e2
+            print(f"[SMARTSCRIBE DESKTOP] Worker fn error: {_e2}")
+
+    t = threading.Thread(target=_worker, daemon=True)
+    t.start()
+    t.join(timeout=timeout)
+    if exc_holder[0] is not None:
+        raise exc_holder[0]
+    return result_holder[0]
+
+def _get_active_window_info_impl() -> Dict[str, Any]:
+    """
+    Internal implementation of get_active_window_info.
+    Must be called from a thread attached to the interactive desktop.
     """
     try:
         user32 = ctypes.windll.user32
@@ -67,7 +122,8 @@ def get_active_window_info() -> Dict[str, Any]:
                 "window_title": "Desktop",
                 "process_name": "explorer.exe",
                 "application": "Windows Desktop",
-                "pid": 0
+                "pid": 0,
+                "hwnd": 0
             }
 
         length = user32.GetWindowTextLengthW(hwnd)
@@ -105,7 +161,8 @@ def get_active_window_info() -> Dict[str, Any]:
             "window_title": clean_title,
             "process_name": exe_name,
             "application": app_name,
-            "pid": pid.value
+            "pid": pid.value,
+            "hwnd": int(hwnd) if hwnd else 0
         }
     except Exception as e:
         return {
@@ -113,8 +170,31 @@ def get_active_window_info() -> Dict[str, Any]:
             "process_name": "explorer.exe",
             "application": "Windows Desktop",
             "pid": 0,
+            "hwnd": 0,
             "error": str(e)
         }
+
+
+def get_active_window_info() -> Dict[str, Any]:
+    """
+    Retrieves the foreground active window title, process ID, and application name
+    using lightweight native Win32 APIs. Runs on a fresh thread attached to the
+    interactive 'default' desktop to avoid HWND=0 from non-interactive Flask threads.
+    Zero keystroke, clipboard, form, or private content collection.
+    """
+    _FALLBACK = {
+        "window_title": "Desktop",
+        "process_name": "explorer.exe",
+        "application": "Windows Desktop",
+        "pid": 0,
+        "hwnd": 0
+    }
+    try:
+        result = run_on_interactive_desktop(_get_active_window_info_impl, timeout=2.0)
+        return result if result is not None else _FALLBACK
+    except Exception as e:
+        _FALLBACK["error"] = str(e)
+        return _FALLBACK
 
 @dataclass
 class DesktopContext:
@@ -138,7 +218,7 @@ class DesktopContext:
             "active_app_display_name": self.active_app_display_name,
             "active_pid": self.active_pid,
             "active_media_item": self.active_media_item,
-            "active_browser_page": self.active_browser_page,
+            "active_browser_page": self.active_browser_page.to_dict() if hasattr(self.active_browser_page, "to_dict") else self.active_browser_page,
             "system_status_summary": self.system_status_summary,
             "timestamp": self.timestamp
         }
@@ -152,7 +232,11 @@ class DesktopContext:
         from backend.assistant.planner.context_snapshot import redact_sensitive_paths
         clean_title = redact_sensitive_paths(sanitize_desktop_string(self.active_window_title))
         media_title = redact_sensitive_paths(sanitize_desktop_string(self.active_media_item.get("title", "None"))) if self.active_media_item else "None"
-        browser_title = redact_sensitive_paths(sanitize_desktop_string(self.active_browser_page.get("title", "None"))) if self.active_browser_page else "None"
+        if self.active_browser_page:
+            raw_b_title = getattr(self.active_browser_page, "title", None) if hasattr(self.active_browser_page, "title") else (self.active_browser_page.get("title", "None") if isinstance(self.active_browser_page, dict) else "None")
+            browser_title = redact_sensitive_paths(sanitize_desktop_string(raw_b_title or "None"))
+        else:
+            browser_title = "None"
         
         return (
             "<untrusted_desktop_metadata>\n"
@@ -167,7 +251,7 @@ class DesktopContext:
 
 def collect_desktop_context(
     active_media_item: Optional[Dict[str, Any]] = None,
-    active_browser_page: Optional[Dict[str, Any]] = None,
+    active_browser_page: Optional[Any] = None,
     include_system_status: bool = False
 ) -> DesktopContext:
     """

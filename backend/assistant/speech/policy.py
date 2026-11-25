@@ -99,9 +99,25 @@ class SpeechPolicy:
         tool_name = intent_data.get("target_tool", "") or intent_data.get("tool_name", "")
         status = intent_data.get("status", "")
 
-        # 0. Verification failure guard
-        if status == "verification_failed" or (status == "failed" and "verification" in response_text.lower()):
-            return "The action was performed, but verification could not be confirmed."
+        # 0. Verification status guards
+        if tool_name in ("click_browser_element", "type_browser_field", "select_browser_option"):
+            if status == "verification_failed" or (status == "failed" and "verification" in response_text.lower()):
+                return "The action was performed, but the expected result could not be confirmed."
+            if status in ("unconfirmed", "verification_unavailable"):
+                return "Action completed, but verification was unavailable."
+            if status in ("policy_denied", "frame_denied", "navigation_blocked") or (status == "failed" and ("prohibited" in response_text.lower() or "blocked" in response_text.lower())):
+                return "Action blocked by safety policy."
+            if status in ("stale_target", "target_mismatch", "target_not_found"):
+                return "Action could not be completed because the page target changed."
+        else:
+            if status == "verification_failed" or (status == "failed" and "verification" in response_text.lower()):
+                return "The action was performed, but verification could not be confirmed."
+            if status in ("unconfirmed", "verification_unavailable"):
+                return "Action completed, but verification was unavailable."
+            if status in ("policy_denied", "frame_denied", "navigation_blocked") or (status == "failed" and ("prohibited" in response_text.lower() or "blocked" in response_text.lower())):
+                return "Action blocked by safety policy."
+            if status in ("stale_target", "target_mismatch", "target_not_found"):
+                return "Action could not be completed because the page target changed."
 
         # 1. Security / Blocked Commands
         if exec_path == "blocked" or intent_name == "prompt_injection_blocked":
@@ -175,6 +191,25 @@ class SpeechPolicy:
                 return sanitize_for_speech(response_text, max_words=25)
             if tool_name == "delete_recording":
                 return "This recording deletion requires your explicit confirmation."
+            if tool_name in ("click_browser_element", "type_browser_field", "select_browser_option"):
+                is_v = intent_data.get("verified", False) or intent_data.get("data", {}).get("verified", False)
+                p_status = intent_data.get("postcondition_status") or intent_data.get("data", {}).get("postcondition_status")
+                if is_v or p_status == "verified":
+                    if tool_name == "type_browser_field":
+                        return "Text entered and verified."
+                    if tool_name == "click_browser_element":
+                        return "Clicked and navigation confirmed."
+                    if tool_name == "select_browser_option":
+                        return "Option selected and verified."
+                    return "Browser action completed and verified."
+                elif p_status == "verification_unavailable" or status in ("unconfirmed", "verification_unavailable"):
+                    return "Action completed, but verification was unavailable."
+                elif p_status == "verification_failed" or status == "verification_failed":
+                    return "The action was performed, but the expected result could not be confirmed."
+                elif status in ("policy_denied", "frame_denied", "navigation_blocked"):
+                    return "Action blocked by safety policy."
+                else:
+                    return sanitize_for_speech(response_text, max_words=20)
 
         # 3. Hybrid Path: System Health, Desktop Activity & Diagnostic Summaries
         if exec_path == "hybrid_path" or intent_name in ("analyze_system_status", "diagnose_performance", "interpret_activity", "plan_workspace_setup"):

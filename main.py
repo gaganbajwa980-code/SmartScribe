@@ -4,9 +4,8 @@ import sys
 import threading
 import time
 import urllib.request
-import webbrowser
+import  webbrowser 
 from pathlib import Path
-
 from config import DATA_DIR
 from server import app
 

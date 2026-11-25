@@ -26,10 +26,25 @@ def tool_read_current_page() -> Dict[str, Any]:
     page = mgr.get_current_page()
 
     if not page:
+        # Bounded poll for newly opened page or extension sync (up to 1.5s)
+        try:
+            from backend.assistant.interaction.browser_bridge import get_browser_bridge
+            bridge = get_browser_bridge()
+            if bridge.is_connected():
+                t_end = time.time() + 1.5
+                while time.time() < t_end:
+                    time.sleep(0.15)
+                    page = mgr.get_current_page()
+                    if page:
+                        break
+        except Exception:
+            pass
+
+    if not page:
         return {
             "success": False,
-            "status": "no_active_page",
-            "message": "No active webpage found. Ingest a URL or click 'Send Page' in the SmartScribe extension.",
+            "status": "browser_not_ready",
+            "message": "I opened the website, but the browser connection wasn't ready yet, so I stopped safely.",
             "data": {}
         }
 

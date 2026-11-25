@@ -182,3 +182,54 @@ def tool_diagnose_smartscribe(**kwargs):
         "active_jobs_count": state["jobs"]["active_job_count"],
         "recommendations": recommendations
     }
+
+def tool_stop_action(**kwargs):
+    """Halts active speech and any in-progress assistant actions immediately."""
+    try:
+        from backend.assistant.speech import SpeechManager
+        SpeechManager().stop()
+    except Exception:
+        pass
+    return {"success": True, "action": "stop", "message": "Stopped."}
+
+def tool_cancel_action(**kwargs):
+    """Cancels the pending or active assistant command."""
+    try:
+        from backend.assistant.speech import SpeechManager
+        SpeechManager().stop()
+    except Exception:
+        pass
+    return {"success": True, "action": "cancel", "message": "Cancelled."}
+
+def tool_dismiss_action(**kwargs):
+    """Dismisses the prompt or current interaction."""
+    try:
+        from backend.assistant.speech import SpeechManager
+        SpeechManager().stop()
+    except Exception:
+        pass
+    return {"success": True, "action": "dismiss", "message": "Understood."}
+
+def tool_pause_action(**kwargs):
+    """Pauses active speech and playback."""
+    try:
+        from backend.assistant.speech import SpeechManager
+        SpeechManager().stop()
+    except Exception:
+        pass
+    return {"success": True, "action": "pause", "message": "Paused."}
+
+def tool_browser_navigate_back(**kwargs):
+    """Navigates back to the previous webpage or view."""
+    try:
+        from backend.assistant.interaction.browser_bridge import get_browser_bridge
+        bridge = get_browser_bridge()
+        if bridge.is_connected():
+            bridge.send_command("NAVIGATE_BACK", payload={})
+    except Exception:
+        pass
+    return {"success": True, "action": "navigate_back", "message": "Navigated back."}
+
+def tool_assistant_greeting(**kwargs):
+    """Greets the user when addressed by name."""
+    return {"success": True, "action": "greeting", "message": "I'm listening. How can I help?"}

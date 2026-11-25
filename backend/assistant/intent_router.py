@@ -44,10 +44,29 @@ APP_MAP = {
     "windows terminal": "terminal",
     "taskmanager": "taskmanager",
     "task manager": "taskmanager",
-    "taskmgr": "taskmgr"
+    "taskmgr": "taskmgr",
+    "settings": "settings",
+    "windows settings": "settings",
+    "microsoft store": "store",
+    "ms store": "store",
+    "windows store": "store",
+    "store": "store"
 }
 
-APP_NAMES_PATTERN = r"(?:google\s+chrome|chrome|browser|microsoft\s+edge|edge|brave\s+browser|brave|paint|mspaint|windows\s+terminal|terminal|task\s+manager|taskmanager|taskmgr|text\s+editor|notepad|calculator|calc|visual\s+studio\s+code|vs\s+code|vscode|code|file\s+explorer|explorer)"
+# Safe, deterministic known-site alias registry
+KNOWN_WEBSITE_ALIASES: Dict[str, str] = {
+    "youtube": "https://www.youtube.com",
+    "wikipedia": "https://www.wikipedia.org",
+    "github": "https://github.com",
+    "google": "https://www.google.com",
+    "reddit": "https://www.reddit.com",
+    "stackoverflow": "https://stackoverflow.com",
+    "canvas": "https://canvas.instructure.com",
+    "huggingface": "https://huggingface.co",
+    "arxiv": "https://arxiv.org",
+}
+
+APP_NAMES_PATTERN = r"(?:windows\s+settings|microsoft\s+store|windows\s+store|ms\s+store|settings|store|google\s+chrome|chrome|browser|microsoft\s+edge|edge|brave\s+browser|brave|paint|mspaint|windows\s+terminal|terminal|task\s+manager|taskmanager|taskmgr|text\s+editor|notepad|calculator|calc|visual\s+studio\s+code|vs\s+code|vscode|code|file\s+explorer|explorer)"
 
 APP_NEGATIVE = re.compile(
     r"\b(why\s+is|why\s+does|why\s+did|why|should\s+i|how\s+does|how\s+come|is\s+it|is\s+\w+\s+safe|don't\s+want|do\s+not\s+want|stop|close|kill|terminate|prevent|hate|uninstall|remove|disable|explain\s+why)\b",
@@ -55,9 +74,9 @@ APP_NEGATIVE = re.compile(
 )
 
 APP_POSITIVE = re.compile(
-    rf"^(?:(?:could|can)\s+you\s+(?:please\s+)?)?(?:open|launch|start|fire\s+up|bring\s+up|run)\s+(?:the\s+|my\s+)?({APP_NAMES_PATTERN})\b|"
+    rf"^(?:(?:could|can)\s+you\s+(?:please\s+)?)?(?:open|launch|start|fire\s+up|bring\s+up|run|go\s+to|switch\s+to|take\s+me\s+to)\s+(?:the\s+|my\s+)?({APP_NAMES_PATTERN})\b|"
     rf"^i\s+need\s+(?:the\s+|my\s+)?({APP_NAMES_PATTERN})\b|"
-    rf"^(?:please\s+)?(?:open|launch|start)\s+(?:the\s+|my\s+)?({APP_NAMES_PATTERN})\b",
+    rf"^(?:please\s+)?(?:open|launch|start|go\s+to|switch\s+to|take\s+me\s+to)\s+(?:the\s+|my\s+)?({APP_NAMES_PATTERN})\b",
     re.IGNORECASE
 )
 
@@ -72,6 +91,46 @@ INJECTION_PATTERNS = [
     re.compile(r"\bshutdown\s+/s\b", re.IGNORECASE),
 ]
 
+SYSTEM_STATUS_REASONING_PATTERNS = re.compile(
+    r"\b("
+    r"why\s+(?:is|are|does|did|would)|"
+    r"how\s+come|"
+    r"what\s+should\s+i\s+do|"
+    r"how\s+(?:can|do)\s+i\s+(?:fix|improve|reduce|lower|cool|free\s+up|speed)|"
+    r"how\s+to\s+(?:fix|improve|reduce|lower|cool|free\s+up|speed)|"
+    r"troubleshoot|"
+    r"overheating|"
+    r"too\s+hot"
+    r")\b",
+    re.IGNORECASE
+)
+
+SYSTEM_STATUS_QUERY_PATTERNS = re.compile(
+    r"\b("
+    r"how('s|\s+is)\s+my\s+(?:laptop|pc|computer|system)(?:\s+(?:doing|performing|running))?|"
+    r"how\s+are\s+my\s+(?:system\s+)?resources(?:\s+doing)?|"
+    r"is\s+my\s+(?:laptop|pc|computer|system)\s+(?:doing\s+)?(?:okay|healthy|fine|good|running\s+fine)|"
+    r"tell\s+me\s+(?:the\s+)?health\s+of\s+my\s+(?:pc|laptop|computer|system)|"
+    r"what('s|\s+is)\s+(?:my\s+)?(?:computer|laptop|pc|system)\s+status|"
+    r"system\s+status|"
+    r"resource\s+status|"
+    r"hardware\s+status|"
+    r"ram\s+usage|"
+    r"cpu\s+usage|"
+    r"memory\s+usage|"
+    r"gpu\s+status|"
+    r"what('s|\s+is)\s+my\s+ram(?:\s+usage)?|"
+    r"what('s|\s+is)\s+my\s+cpu(?:\s+usage)?|"
+    r"what('s|\s+is)\s+my\s+gpu|"
+    r"what\s+gpu\s+do\s+i\s+have|"
+    r"is\s+my\s+gpu\s+free|"
+    r"check\s+(?:gpu|ram|cpu|resources|hardware|memory)|"
+    r"how\s+much\s+(?:ram|cpu)\s*(?:is\s+free|used)?|"
+    r"system\s+resources"
+    r")\b",
+    re.IGNORECASE
+)
+
 class IntentRouter:
     """
     Centralized Intent Router.
@@ -83,7 +142,25 @@ class IntentRouter:
     """
 
     def route(self, query: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        q = query.strip()
+        raw_q = query.strip()
+        # 1. Wake word normalization & harmless prefix stripping
+        q_stripped = re.sub(r"^(?:(?:hey|okay|ok|hi|hello)\s+)?smartscribe[,\s:]*", "", raw_q, flags=re.IGNORECASE).strip()
+        q_stripped = re.sub(r"^(?:please[,\s]+|(?:could|can)\s+you\s+(?:please\s+)?)", "", q_stripped, flags=re.IGNORECASE).strip()
+
+        # If user only called SmartScribe by name (e.g. "Hey SmartScribe", "SmartScribe")
+        if not q_stripped and re.search(r"\bsmartscribe\b", raw_q, re.IGNORECASE):
+            return {
+                "intent": "assistant_greeting",
+                "category": IntentCategory.SYSTEM_CONTROL.value,
+                "confidence": 1.0,
+                "execution_path": ExecutionPath.FAST_PATH.value,
+                "target_tool": "assistant_greeting",
+                "arguments": {},
+                "requires_context": False,
+                "raw_query": raw_q
+            }
+
+        q = q_stripped if q_stripped else raw_q
         q_clean = q.rstrip(".?!;,").strip()
         q_lower = q_clean.lower()
 
@@ -100,8 +177,76 @@ class IntentRouter:
                     "target_tool": None,
                     "arguments": {"reason": "Potential adversarial prompt injection detected."},
                     "requires_context": False,
-                    "raw_query": q
+                    "raw_query": raw_q
                 }
+
+        # -------------------------------------------------------------
+        # 0.25. FAST PATH CONTROL ACTIONS (Deterministic, < 5ms, Zero LLM)
+        # -------------------------------------------------------------
+        # Stop
+        if re.match(r"^(?:stop(?:\s+(?:it|that|now|playback|reading|talking|speaking|listening|everything))?|halt|abort|shut\s+up|be\s+quiet|silence)$", q_lower):
+            return {
+                "intent": "stop_action",
+                "category": IntentCategory.SYSTEM_CONTROL.value,
+                "confidence": 1.0,
+                "execution_path": ExecutionPath.FAST_PATH.value,
+                "target_tool": "stop_action",
+                "arguments": {},
+                "requires_context": False,
+                "raw_query": raw_q
+            }
+
+        # Cancel
+        if re.match(r"^(?:cancel(?:\s+(?:that|this|it|action|request|command|plan|execution|operation))?|disregard)$", q_lower):
+            return {
+                "intent": "cancel_action",
+                "category": IntentCategory.SYSTEM_CONTROL.value,
+                "confidence": 1.0,
+                "execution_path": ExecutionPath.FAST_PATH.value,
+                "target_tool": "cancel_action",
+                "arguments": {},
+                "requires_context": False,
+                "raw_query": raw_q
+            }
+
+        # Dismiss / Never mind
+        if re.match(r"^(?:never\s*mind|forget\s+(?:it|that|about\s+it)|dismiss|ignore\s+(?:that|this|it))$", q_lower):
+            return {
+                "intent": "dismiss_action",
+                "category": IntentCategory.SYSTEM_CONTROL.value,
+                "confidence": 1.0,
+                "execution_path": ExecutionPath.FAST_PATH.value,
+                "target_tool": "dismiss_action",
+                "arguments": {},
+                "requires_context": False,
+                "raw_query": raw_q
+            }
+
+        # Pause
+        if re.match(r"^(?:pause(?:\s+(?:it|that|now|playback|speech))?|hold\s+on|wait\s+a\s+(?:sec|second|moment|minute))$", q_lower):
+            return {
+                "intent": "pause_action",
+                "category": IntentCategory.SYSTEM_CONTROL.value,
+                "confidence": 1.0,
+                "execution_path": ExecutionPath.FAST_PATH.value,
+                "target_tool": "pause_action",
+                "arguments": {},
+                "requires_context": False,
+                "raw_query": raw_q
+            }
+
+        # Go back / Navigate back
+        if re.match(r"^(?:go\s+back|navigate\s+back|back|previous\s+page)$", q_lower):
+            return {
+                "intent": "browser_navigate_back",
+                "category": IntentCategory.APP_AUTOMATION.value,
+                "confidence": 1.0,
+                "execution_path": ExecutionPath.FAST_PATH.value,
+                "target_tool": "browser_navigate_back",
+                "arguments": {},
+                "requires_context": False,
+                "raw_query": raw_q
+            }
 
         # -------------------------------------------------------------
         # 0.5. PLAN PATH: Multi-Step Desktop Task Planning (< 15ms detection)
@@ -147,6 +292,18 @@ class IntentRouter:
             is_multistep = True
         elif re.search(r"\b(?:delete|remove)\s+it\b", q_lower):
             is_multistep = True
+        elif re.search(r"\bstart\s+recording\s+(?:and|\&|,)\s+(?:then\s+)?open\s+.+\b", q_lower):
+            is_multistep = True
+        elif re.search(r"\b(?:open|play)\s+.+?\s+(?:and|\&|,)\s+(?:then\s+)?(?:summarize|explain)\s+(?:it|this|them)\b", q_lower):
+            is_multistep = True
+        elif re.search(r"\b(?:open|launch|go\s+to|visit)\s+(?:the\s+)?([a-zA-Z0-9_.-]+)[,\s]+(?:and\s+)?(?:then\s+)?(?:search|look\s+up|find)\b", q_lower):
+            is_multistep = True
+        elif re.search(r"\bstart\s+recording\s+(?:and|,)\s+(?:then\s+)?(?:create|make|write|open|launch|search|type)\b", q_lower):
+            is_multistep = True
+        elif re.search(r"\bopen\s+" + APP_NAMES_PATTERN + r"\s+and\s+(?:write|type|enter|input)\b", q_lower, re.IGNORECASE):
+            is_multistep = True
+        elif re.search(r"\bgo\s+to\s+.+?\s+and\s+(?:open|launch|start|go\s+to)\s+.+\b", q_lower):
+            is_multistep = True
 
         if is_multistep:
             return {
@@ -176,18 +333,6 @@ class IntentRouter:
                 "raw_query": q
             }
 
-        # Qualitative system health: "How is my laptop?", "Is my laptop healthy?"
-        if re.search(r"\b(how('s| is) my (laptop|pc|computer|system)( doing)?|is my (laptop|pc|computer|system) (doing )?(okay|healthy|fine)|how are my system resources|tell me the health of my (pc|laptop|computer)|explain (whether )?my system (memory|resource|health)|analyze my system (performance|health))\b", q_lower):
-            return {
-                "intent": "analyze_system_status",
-                "category": IntentCategory.SYSTEM_CONTROL.value,
-                "confidence": 0.96,
-                "execution_path": ExecutionPath.HYBRID_PATH.value,
-                "target_tool": "get_system_status",
-                "arguments": {},
-                "requires_context": False,
-                "raw_query": q
-            }
 
         # Qualitative desktop activity interpretation: "Am I working on my operating systems project?", "What am I currently working on?"
         if re.search(r"\b(am i working on|what am i (currently )?(working on|doing)|what is my current (task|activity|project)|tell me what i('m| am) working on|what am i doing right now)\b", q_lower):
@@ -221,8 +366,8 @@ class IntentRouter:
         # 2. FAST PATH: Deterministic System Metrics & Utilities (< 50ms)
         # -------------------------------------------------------------
 
-        # A. Deterministic System / RAM / CPU / GPU Lookup
-        if re.search(r"\b(system status|ram usage|what('s| is) my ram|what('s| is) my cpu( usage)?|cpu usage|what gpu do i have|is my gpu free|check (gpu|ram|cpu|resources)|resource status|hardware status|check memory|memory usage|gpu status|how much ram|how much cpu)\b", q_lower):
+        # A. Deterministic System Health & Hardware Status (< 15ms, zero LLM)
+        if not SYSTEM_STATUS_REASONING_PATTERNS.search(q_lower) and SYSTEM_STATUS_QUERY_PATTERNS.search(q_lower):
             return {
                 "intent": "get_system_status",
                 "category": IntentCategory.SYSTEM_CONTROL.value,
@@ -295,16 +440,31 @@ class IntentRouter:
             bool(re.search(r"\bcreate\s+(?:a\s+)?note\s+(?:called|named)\s+['\"]?([^'\"]+?)['\"]?\s+and\s+(?:open|show)\s+(?:the\s+)?notes\s+folder\b", q_lower)) or
             bool(re.search(r"\bopen\s+(?:my\s+)?(latest\s+(?:lecture\s+)?recording)\s+and\s+(?:then\s+)?open\s+(?:my\s+)?(.+?\s+notes?)\b", q_lower)) or
             bool(re.search(r"\bopen\s+(chrome|browser|edge|brave)\s+and\s+(?:open|browse\s+to|navigate\s+to)\s+(?:my\s+)?(.+?(?:website|portal|page|canvas|blackboard|moodle))\b", q_lower)) or
-            bool(re.search(r"\bopen\s+(chrome|browser|edge)\s*,\s*(?:open\s+)?(?:the\s+)?(.+?(?:portal|website))\s*,\s*and\s+(?:then\s+)?open\s+(?:my\s+)?(.+?\s+notes?)\b", q_lower))
+            bool(re.search(r"\bopen\s+(chrome|browser|edge)\s*,\s*(?:open\s+)?(?:the\s+)?(.+?(?:portal|website))\s*,\s*and\s+(?:then\s+)?open\s+(?:my\s+)?(.+?\s+notes?)\b", q_lower)) or
+            # Conversational Browser Compound Goals (e.g. "Open YouTube and search for operating systems", "Go to Wikipedia and search operating systems")
+            bool(re.search(r"\b(?:open|launch|go\s+to|visit|browse(?:\s+to)?)\s+(?:the\s+)?([a-zA-Z0-9_.-]+)\s+(?:and|,|then)\s+(?:then\s+)?(?:search(?:\s+for)?|look\s+up|find)\b", q_lower)) or
+            bool(re.search(r"\b(?:on\s+[a-zA-Z0-9_.-]+\s+search\s+(?:for\s+)?|search\s+(?:for\s+)?.+?\s+on\s+[a-zA-Z0-9_.-]+)\b", q_lower)) or
+            bool(re.search(r"\btype\s+.+?\s+into\s+.+?\s+and\s+(?:then\s+)?click\b", q_lower)) or
+            bool(re.search(r"\bsearch\s+for\s+.+?\s+and\s+tell\s+me\b", q_lower)) or
+            # Ambiguous/vague pronoun commands requiring session context or clarification
+            bool(re.match(r"^(?:open|launch|play|show|view|explore)\s+(?:it|that|this)$", q_lower)) or
+            bool(re.match(r"^(?:open|go\s+to|visit)\s+(?:that|the)\s+site$", q_lower)) or
+            bool(re.match(r"^click\s+(?:that|it|this)$", q_lower)) or
+            bool(re.match(r"^search\s+(?:for\s+)?(?:it|that)$", q_lower)) or
+            bool(re.match(r"^(?:do\s+something(?:\s+with\s+this\s+page)?|help\s+me\s+with\s+this\s+page)$", q_lower)) or
+            # Single browser DOM actions
+            bool(re.search(r"\btype\s+.+?\s+into\s+(?:the\s+)?(?:search(?:\s+box|\s+field|\s+input)?|input|field|textbox)\b", q_lower)) or
+            bool(re.search(r"\bclick\s+(?:the\s+)?(?:search(?:\s+button|\s+icon)?|first(?:\s+safe)?\s+result|result(?:\s+link)?|button|link)\b", q_lower)) or
+            bool(re.search(r"\bselect\s+(?:option\s+)?.+?\s+(?:in|from)\s+(?:the\s+)?(?:dropdown|select)\b", q_lower))
         )
         if is_plan_query:
             return {
-                "intent": "execute_task_plan",
+                "intent": "task_planning",
                 "category": IntentCategory.TASK_PLANNING.value,
                 "confidence": 0.96,
                 "execution_path": ExecutionPath.PLAN_PATH.value,
                 "target_tool": "execute_plan",
-                "arguments": {"query": q},
+                "arguments": {"user_query": q},
                 "requires_context": True,
                 "raw_query": q
             }
@@ -334,6 +494,39 @@ class IntentRouter:
                 "raw_query": q
             }
 
+        # E2. Browser Video Controls (Fast Path — deterministic keyboard shortcuts)
+        # "Play next video", "next video", "go to next video"
+        if re.search(
+            r"\b(?:play\s+(?:the\s+)?next(?:\s+video)?|next\s+video|go\s+to\s+(?:the\s+)?next\s+video|skip\s+(?:this\s+)?video)\b",
+            q_lower
+        ):
+            return {
+                "intent": "browser_next_video",
+                "category": IntentCategory.BROWSER_INTELLIGENCE.value,
+                "confidence": 0.97,
+                "execution_path": ExecutionPath.PLAN_PATH.value,
+                "target_tool": "execute_plan",
+                "arguments": {"user_query": q},
+                "requires_context": False,
+                "raw_query": q
+            }
+
+        # "Pause the video", "pause", "stop the video", "play", "resume the video"
+        if re.search(
+            r"\b(?:pause(?:\s+(?:the\s+)?video)?|stop\s+(?:the\s+)?video|unpause(?:\s+video)?|resume(?:\s+the\s+)?video|play\s+(?:the\s+)?video|toggle\s+(?:video\s+)?playback)\b",
+            q_lower
+        ):
+            return {
+                "intent": "browser_pause_video",
+                "category": IntentCategory.BROWSER_INTELLIGENCE.value,
+                "confidence": 0.96,
+                "execution_path": ExecutionPath.PLAN_PATH.value,
+                "target_tool": "execute_plan",
+                "arguments": {"user_query": q},
+                "requires_context": False,
+                "raw_query": q
+            }
+
         # F. Safe App Launcher (with Negative / Interrogative Guardrails)
         neg_matched = bool(APP_NEGATIVE.search(q))
         if not neg_matched:
@@ -354,14 +547,51 @@ class IntentRouter:
                         "raw_query": q
                     }
 
-        # G. Open Website
-        m_web = re.search(r"\b(open|browse|browse to|go to|visit)\s+(https?://\S+|www\.\S+|[a-zA-Z0-9.-]+\.(?:com|org|io|net|edu|gov))\b", q_lower)
+        # G1. Known Website Aliases (Fast Path)
+        m_alias = re.search(
+            r"^(?:(?:could|can)\s+you\s+(?:please\s+)?)?(?:open|launch|go\s+to|take\s+me\s+to|visit|browse(?:\s+to)?)\s+(?:the\s+|my\s+)?([a-zA-Z0-9_-]+)(?:\s+website|\s+site)?(?:\s+for\s+me)?$",
+            q_lower
+        )
+        if m_alias:
+            alias_candidate = m_alias.group(1).lower().strip()
+            if alias_candidate in KNOWN_WEBSITE_ALIASES:
+                target_url = KNOWN_WEBSITE_ALIASES[alias_candidate]
+                return {
+                    "intent": "open_website",
+                    "category": IntentCategory.APP_AUTOMATION.value,
+                    "confidence": 0.96,
+                    "execution_path": ExecutionPath.FAST_PATH.value,
+                    "target_tool": "open_website",
+                    "arguments": {"url": target_url},
+                    "requires_context": False,
+                    "raw_query": q
+                }
+            elif alias_candidate in ("it", "that", "this", "something", "site", "website"):
+                # Pronoun / vague referent -> falls through to PLAN_PATH / clarification
+                pass
+            elif re.search(r"\b(?:website|site)\b", q_lower):
+                # Explicit website requested but alias unknown -> clarify
+                return {
+                    "intent": "request_clarification",
+                    "category": IntentCategory.APP_AUTOMATION.value,
+                    "confidence": 0.90,
+                    "execution_path": ExecutionPath.PLAN_PATH.value,
+                    "target_tool": "execute_plan",
+                    "arguments": {"query": q},
+                    "requires_context": True,
+                    "raw_query": q
+                }
+
+        # G2. Open Website by URL / Domain (Fast Path)
+        m_web = re.search(r"\b(open|browse|browse to|go to|visit|launch|take me to)\s+(https?://\S+|www\.\S+|[a-zA-Z0-9.-]+\.(?:com|org|io|net|edu|gov|co|ai))\b", q_lower)
         if m_web:
             url_target = m_web.group(2)
+            if not url_target.startswith(("http://", "https://")):
+                url_target = "https://" + url_target
             return {
                 "intent": "open_website",
                 "category": IntentCategory.APP_AUTOMATION.value,
-                "confidence": 0.94,
+                "confidence": 0.95,
                 "execution_path": ExecutionPath.FAST_PATH.value,
                 "target_tool": "open_website",
                 "arguments": {"url": url_target},
@@ -437,7 +667,7 @@ class IntentRouter:
             }
 
         # H1. Open File / Structured Target Resolution (Fast Path)
-        m_open_fld_alias = re.search(r"\b(?:open|show|play|view)\s+(?:me\s+)?(?:my\s+)?(downloads(?:\s+folder)?|recordings(?:\s+folder)?|notes(?:\s+folder)?)\b", q_lower)
+        m_open_fld_alias = re.search(r"\b(?:open|show|play|view)\s+(?:me\s+)?(?:my\s+)?(?:smartscribe\s+)?(downloads(?:\s+folder)?|recordings(?:\s+folder)?|notes(?:\s+folder)?)\b", q_lower)
         if m_open_fld_alias:
             target_key = m_open_fld_alias.group(1).strip()
             file_arg = "notes"
@@ -546,7 +776,7 @@ class IntentRouter:
             }
 
         # J. Summarize Current Session
-        if re.search(r"\b(summarize this (meeting|lecture|video|recording|session)|summarize current session|summarize the lecture|give me (a|the) summary)\b", q_lower):
+        if re.search(r"\b(summarize this (meeting|lecture|video|recording|session)|summarize current session|summarize the lecture|give me (a|the) summary)\b", q_lower) and not re.search(r"\b(page|article|webpage)\b", q_lower):
             return {
                 "intent": "summarize_current_session",
                 "category": IntentCategory.MEDIA_QUERY.value,
@@ -572,7 +802,7 @@ class IntentRouter:
             }
 
         # L. Read Current Page / Metadata (< 10ms Fast Path)
-        if re.search(r"\b(read (this|current|the) (page|article|webpage)|read what i('m| am) looking at|what (page|article) am i (reading|looking at)|what is on this page|inspect (this|current) page)\b", q_lower):
+        if re.search(r"\b(read (this|current|the) (page|article|webpage)|read what i('m| am) looking at|what (page|article) am i (reading|looking at)|what('s|\s+is)\s+on\s+(this|the|current)\s+(page|article|webpage)|what is on this page|what's on this page|inspect (this|current) page)\b", q_lower):
             return {
                 "intent": "read_current_page",
                 "category": IntentCategory.BROWSER_INTELLIGENCE.value,
@@ -589,7 +819,7 @@ class IntentRouter:
         # -------------------------------------------------------------
 
         # Browser Article Summarization
-        if re.search(r"\b(summarize (this|current|the) (page|webpage)|summarize (this|the) article|give me (a |the )?summary of this (page|article)|summarize what i('m| am) reading|summary of (this|the) (page|article))\b", q_lower):
+        if re.search(r"\b(what('s|\s+is)\s+(this|the|my\s+current)\s+(page|article|webpage)\s+about|tell\s+me\s+what\s+this\s+page\s+is\s+about|summarize\s+(this|current|the)\s+(page|webpage)|summarize\s+(this|the)\s+article|give\s+me\s+(a\s+|the\s+)?summary\s+of\s+this\s+(page|article|webpage)|summarize\s+what\s+i('m|\s+am)\s+reading|summary\s+of\s+(this|the)\s+(page|article))\b", q_lower):
             return {
                 "intent": "summarize_current_page",
                 "category": IntentCategory.BROWSER_INTELLIGENCE.value,
@@ -602,7 +832,7 @@ class IntentRouter:
             }
 
         # Browser Extract Key Points
-        if re.search(r"\b(what are the (key|important|main) points (on|of|in|from)? ?(this|the)? ?(page|article|here)?|important points here|extract key points|key takeaways|bullet points of this (page|article))\b", q_lower):
+        if re.search(r"\b(what\s+are\s+the\s+(key|important|main)\s+(points|takeaways|things)(\s+(on|of|in|from))?\s*(this|the)?\s*(page|article|here)?|important\s+points\s+here|extract\s+key\s+points|key\s+takeaways|bullet\s+points\s+of\s+this\s+(page|article)|give\s+me\s+the\s+key\s+points|list\s+the\s+(main|key)\s+points)\b", q_lower):
             return {
                 "intent": "extract_key_points",
                 "category": IntentCategory.BROWSER_INTELLIGENCE.value,
@@ -615,7 +845,7 @@ class IntentRouter:
             }
 
         # Browser Explain Article Simply
-        if re.search(r"\b(explain this (page|article|webpage)( simply)?|explain what i('m| am) reading|break down this (page|article|webpage)|explain the article simply)\b", q_lower):
+        if re.search(r"\b(explain\s+this\s+(page|article|webpage)(\s+simply)?|(can\s+you\s+)?explain\s+what\s+i('m|\s+am)\s+(reading|looking\s+at)|break\s+down\s+this\s+(page|article|webpage)|explain\s+the\s+article\s+simply)\b", q_lower):
             return {
                 "intent": "explain_current_page",
                 "category": IntentCategory.BROWSER_INTELLIGENCE.value,

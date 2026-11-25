@@ -159,6 +159,10 @@
               <span>SmartScribe Personal Assistant</span>
             </div>
             <div style="display: flex; align-items: center; gap: 8px;">
+              <div class="assistant-browser-pill" id="assistant-browser-indicator" style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: rgba(148, 163, 184, 0.12); border: 1px solid rgba(148, 163, 184, 0.25); font-size: 0.76rem; color: var(--text-muted);" title="Browser Bridge Status">
+                <span class="assistant-status-dot" id="assistant-browser-dot" style="background: #94a3b8; width: 6px; height: 6px; border-radius: 50%;"></span>
+                <span id="assistant-browser-status-text">Browser: Disconnected</span>
+              </div>
               <div class="assistant-speech-pill" id="assistant-speech-indicator" style="display: none; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.3); font-size: 0.76rem; color: #38bdf8;">
                 <span class="pulse-dot" style="width: 6px; height: 6px; border-radius: 50%; background: #38bdf8; display: inline-block;"></span>
                 <span>Speaking</span>
@@ -198,11 +202,12 @@
           <div class="command-examples-row">
             <span class="command-examples-label">Try:</span>
             <span class="command-example-chip" onclick="setAndRunCommand('Open Chrome')">"Open Chrome"</span>
+            <span class="command-example-chip" onclick="setAndRunCommand('Open Wikipedia and search for Operating Systems')">"Open Wikipedia &amp; search"</span>
+            <span class="command-example-chip" onclick="setAndRunCommand('Find my latest lecture recording')">"Find lecture"</span>
+            <span class="command-example-chip" onclick="setAndRunCommand('Start recording, then open my notes')">"Record &amp; open notes"</span>
             <span class="command-example-chip" onclick="setAndRunCommand('How is my laptop?')">"How is my laptop?"</span>
             <span class="command-example-chip" onclick="setAndRunCommand('Summarize this page')">"Summarize this page"</span>
-            <span class="command-example-chip" onclick="setAndRunCommand('Read this article')">"Read this article"</span>
             <span class="command-example-chip" onclick="setAndRunCommand('What time is it?')">"What time is it?"</span>
-            <span class="command-example-chip" onclick="setAndRunCommand('Summarize today\'s lecture')">"Summarize today's lecture"</span>
           </div>
 
           <!-- Assistant Conversation & Live Tool Stream -->
@@ -1351,7 +1356,7 @@
     </p>
 
     <div>
-      <div style="font-size: 0.78rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px;">Target Parameters</div>
+      <div style="font-size: 0.78rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px;">Action Details</div>
       <div class="confirmation-args-box" id="confirm-modal-args">
         {}
       </div>
